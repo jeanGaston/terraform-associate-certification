@@ -1,0 +1,13 @@
+# server: ${name}
+size      = ${size}
+replicas  = ${replicas}
+log_level = ${log_level}
+
+%{ for port in ports ~}
+listen ${port}
+%{ endfor ~}
+
+[tags]
+%{ for k, v in tags ~}
+${k} = ${v}
+%{ endfor ~}
