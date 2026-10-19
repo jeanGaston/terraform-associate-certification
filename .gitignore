@@ -36,3 +36,9 @@ tfplan
 # In this training repo we ignore lab lock files so each learner generates their own.
 **/lab/.terraform.lock.hcl
 **/lab/**/.terraform.lock.hcl
+
+# Lab sandboxes created by scripts/lab-server.py
+.lab-workspace/
+
+# Python bytecode
+__pycache__/

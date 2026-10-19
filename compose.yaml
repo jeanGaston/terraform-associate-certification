@@ -1,0 +1,19 @@
+name: terraform-associate
+
+services:
+  lab:
+    build:
+      context: .
+      args:
+        TERRAFORM_VERSION: ${TERRAFORM_VERSION:-1.16.6}
+    image: terraform-associate-lab:latest
+    init: true                 # reaps processes left behind by lab shells
+    ports:
+      - "127.0.0.1:${LAB_PORT:-8000}:8000"   # localhost only, never exposed on your network
+    volumes:
+      - lab-workspace:/course/.lab-workspace          # your lab sandboxes (edits, state, outputs)
+      - terraform-home:/home/learner/.terraform.d     # provider cache + `terraform login` credentials (lab 08)
+
+volumes:
+  lab-workspace:
+  terraform-home:

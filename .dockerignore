@@ -1,0 +1,15 @@
+.git
+.claude
+.lab-workspace
+site/content.js
+**/.terraform
+**/.terraform.lock.hcl
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfplan
+**/tfplan
+**/output
+**/crash*.log
+Dockerfile
+compose.yaml
+.dockerignore
