@@ -1,0 +1,4 @@
+# Dockerfile lint settings (checked in CI by .github/workflows/checks.yml)
+failure-threshold: warning
+ignored:
+  - DL3008   # pinning Debian package versions breaks the build whenever bookworm ships a security update

@@ -11,6 +11,7 @@ Stdlib only. Needs Linux, macOS or WSL (uses pty), or run it in Docker (see comp
 Listens on 127.0.0.1 by default, rejects non-localhost Host headers, and every API call
 needs a per-run token, so other websites can't drive your shell.
 """
+
 import argparse
 import codecs
 import fcntl
@@ -53,7 +54,8 @@ def workspace(lab, create=True):
     ws = WORKSPACE / lab
     if create and not ws.exists():
         shutil.copytree(
-            ROOT / "lessons" / lab / "lab", ws,
+            ROOT / "lessons" / lab / "lab",
+            ws,
             ignore=shutil.ignore_patterns(".terraform", ".terraform.lock.hcl", "*.tfstate*", "output", "*.log"),
         )
     return ws
@@ -88,8 +90,15 @@ def run_check(lab, check_id):
     cmd = lab_check(lab, check_id)
     env = dict(os.environ, TF_IN_AUTOMATION="1", TF_INPUT="0", NO_COLOR="1")
     try:
-        r = subprocess.run(["bash", "-c", cmd], cwd=workspace(lab), env=env, capture_output=True,
-                           text=True, timeout=CHECK_TIMEOUT, stdin=subprocess.DEVNULL)
+        r = subprocess.run(
+            ["bash", "-c", cmd],
+            cwd=workspace(lab),
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=CHECK_TIMEOUT,
+            stdin=subprocess.DEVNULL,
+        )
         output = re.sub(r"\x1b\[[0-9;]*m", "", r.stdout + r.stderr)  # Terraform ignores NO_COLOR
         return {"ok": r.returncode == 0, "output": output[-2000:]}
     except subprocess.TimeoutExpired:
@@ -103,9 +112,14 @@ class Terminal:
         self.buf, self.offset = bytearray(), 0  # offset = bytes dropped from the front
         self.cond = threading.Condition()
         self.alive = True
-        env = dict(os.environ, TERM="xterm-256color", COLORTERM="truecolor", LAB=lab,
-                   PS1=f"\\[\\e[1;35m\\]lab {lab[:2]}\\[\\e[0m\\] \\[\\e[36m\\]\\W\\[\\e[0m\\] $ ",
-                   HISTFILE=str(cwd.parent / f".history-{lab}"))
+        env = dict(
+            os.environ,
+            TERM="xterm-256color",
+            COLORTERM="truecolor",
+            LAB=lab,
+            PS1=f"\\[\\e[1;35m\\]lab {lab[:2]}\\[\\e[0m\\] \\[\\e[36m\\]\\W\\[\\e[0m\\] $ ",
+            HISTFILE=str(cwd.parent / f".history-{lab}"),
+        )
         env.pop("PROMPT_COMMAND", None)
         pid, fd = pty.fork()
         if pid == 0:  # child
@@ -221,11 +235,20 @@ class Handler(BaseHTTPRequestHandler):
             version = None
             if tf:
                 try:
-                    version = subprocess.run([tf, "version"], capture_output=True, text=True, timeout=10).stdout.splitlines()[0]
+                    version = subprocess.run(
+                        [tf, "version"], capture_output=True, text=True, timeout=10
+                    ).stdout.splitlines()[0]
                 except Exception:  # noqa: BLE001
                     version = "terraform (version unknown)"
             epoch = EPOCH_FILE.read_text().strip() if EPOCH_FILE.exists() else None
-            return self._json({"token": TOKEN, "terraform": version, "workspace": str(WORKSPACE.relative_to(ROOT)), "progressEpoch": epoch})
+            return self._json(
+                {
+                    "token": TOKEN,
+                    "terraform": version,
+                    "workspace": str(WORKSPACE.relative_to(ROOT)),
+                    "progressEpoch": epoch,
+                }
+            )
         if not self._authorized(query):
             return self.send_error(401, "Missing or bad token")
         try:
@@ -257,11 +280,17 @@ class Handler(BaseHTTPRequestHandler):
                         raise KeyError(path.name)
                     if path.stat().st_size > MAX_FILE:
                         raise ValueError("file too large to edit here")
-                    return self._json({"content": path.read_text(encoding="utf-8", errors="replace"), "mtime": path.stat().st_mtime})
+                    return self._json(
+                        {"content": path.read_text(encoding="utf-8", errors="replace"), "mtime": path.stat().st_mtime}
+                    )
                 if method == "PUT":
                     data = json.loads(self._body())
-                    if path.exists() and data.get("mtime") is not None and not data.get("force") \
-                            and abs(path.stat().st_mtime - data["mtime"]) > 1e-6:
+                    if (
+                        path.exists()
+                        and data.get("mtime") is not None
+                        and not data.get("force")
+                        and abs(path.stat().st_mtime - data["mtime"]) > 1e-6
+                    ):
                         return self._json({"error": "changed on disk", "mtime": path.stat().st_mtime}, 409)
                     path.parent.mkdir(parents=True, exist_ok=True)
                     path.write_text(data["content"], encoding="utf-8")
@@ -278,7 +307,13 @@ class Handler(BaseHTTPRequestHandler):
                 workspace(lab)
                 return self._json({"ok": True})
             if action == "terms" and method == "GET":
-                return self._json({"terms": [{"id": t.id, "created": t.created} for t in sorted(terms_for(lab), key=lambda t: t.created)]})
+                return self._json(
+                    {
+                        "terms": [
+                            {"id": t.id, "created": t.created} for t in sorted(terms_for(lab), key=lambda t: t.created)
+                        ]
+                    }
+                )
             if action == "terms" and method == "POST":
                 with TERMS_LOCK:
                     if sum(t.alive for t in TERMS.values()) >= MAX_TERMS:
@@ -326,7 +361,7 @@ class Handler(BaseHTTPRequestHandler):
                         term.cond.wait(timeout=15)
                         end = term.offset + len(term.buf)
                     start = max(pos, term.offset)
-                    chunk = bytes(term.buf[start - term.offset:])
+                    chunk = bytes(term.buf[start - term.offset :])
                     alive = term.alive
                 if chunk:
                     pos = end
@@ -361,21 +396,37 @@ class Handler(BaseHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(body)
 
-    def do_GET(self): self._route("GET")
-    def do_HEAD(self): self._route("HEAD")
-    def do_POST(self): self._route("POST")
-    def do_PUT(self): self._route("PUT")
-    def do_DELETE(self): self._route("DELETE")
+    def do_GET(self):
+        self._route("GET")
+
+    def do_HEAD(self):
+        self._route("HEAD")
+
+    def do_POST(self):
+        self._route("POST")
+
+    def do_PUT(self):
+        self._route("PUT")
+
+    def do_DELETE(self):
+        self._route("DELETE")
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--port", type=int, default=8000)
-    ap.add_argument("--host", default="127.0.0.1",
-                    help="interface to listen on (default 127.0.0.1; the container uses 0.0.0.0 behind a localhost-only port mapping)")
+    ap.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="interface to listen on (default 127.0.0.1; "
+        "the container uses 0.0.0.0 behind a localhost-only port mapping)",
+    )
     ap.add_argument("--no-build", action="store_true", help="skip regenerating site/content.js")
-    ap.add_argument("--reset", action="store_true",
-                    help="start over: delete all lab sandboxes and clear saved progress in browsers that open the site")
+    ap.add_argument(
+        "--reset",
+        action="store_true",
+        help="start over: delete all lab sandboxes and clear saved progress in browsers that open the site",
+    )
     args = ap.parse_args()
     if not args.no_build:
         subprocess.run([sys.executable, str(ROOT / "scripts" / "build-site.py")], check=True)
@@ -391,7 +442,9 @@ def main():
     tf = shutil.which("terraform")
     print(f"\n  Lab server running:  http://localhost:{args.port}")
     print(f"  Lab sandboxes:       {WORKSPACE.relative_to(ROOT)}/<lesson>  (use 'Reset lab' in the site to start over)")
-    print(f"  Terraform:           {tf or 'NOT FOUND on PATH - install it: https://developer.hashicorp.com/terraform/install'}")
+    print(
+        f"  Terraform:           {tf or 'NOT FOUND on PATH - install it: https://developer.hashicorp.com/terraform/install'}"
+    )
     print("  Stop with Ctrl+C\n")
     try:
         srv.serve_forever()

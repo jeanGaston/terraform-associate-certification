@@ -1,0 +1,6 @@
+# Lint + format settings for scripts/ (checked in CI by .github/workflows/checks.yml)
+line-length = 120
+target-version = "py312"
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP"]

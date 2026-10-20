@@ -4,6 +4,7 @@
 Stdlib only. Run from anywhere:  python3 scripts/build-site.py
 Then open site/index.html in a browser (or serve with: python3 -m http.server -d site).
 """
+
 import json
 import re
 from pathlib import Path
@@ -42,23 +43,27 @@ def build_lessons():
                 if any(p.startswith(".terraform") or p == "output" for p in parts):
                     continue
                 if f.is_file() and f.suffix in LAB_FILE_EXTS and f.name != "LAB.md":
-                    files.append({
-                        "path": f.relative_to(lab_dir).as_posix(),
-                        "content": f.read_text(encoding="utf-8"),
-                    })
+                    files.append(
+                        {
+                            "path": f.relative_to(lab_dir).as_posix(),
+                            "content": f.read_text(encoding="utf-8"),
+                        }
+                    )
         md, quiz = split_quiz(md, f"{rel}/README.md")
         lab_md = read(f"{rel}/lab/LAB.md") if (lab_dir / "LAB.md").exists() else ""
-        lessons.append({
-            "id": d.name,
-            "num": num,
-            "title": short,
-            "dir": rel,
-            "md": md,
-            "quiz": quiz,
-            "lab": lab_md,
-            "labCheckpoints": parse_checkpoints(lab_md, f"{rel}/lab/LAB.md"),
-            "labFiles": files,
-        })
+        lessons.append(
+            {
+                "id": d.name,
+                "num": num,
+                "title": short,
+                "dir": rel,
+                "md": md,
+                "quiz": quiz,
+                "lab": lab_md,
+                "labCheckpoints": parse_checkpoints(lab_md, f"{rel}/lab/LAB.md"),
+                "labFiles": files,
+            }
+        )
     return lessons
 
 
@@ -126,13 +131,25 @@ def parse_checkpoints(md, where):
             answer = [a.strip() for a in fields.get("answer", "").split(",") if a.strip()]
             if not answer or any(a not in {o["key"] for o in options} for a in answer):
                 raise SystemExit(f"{where}: question {nq} needs an `answer:` matching its options")
-            cp = {"kind": "question", "id": f"q{nq}", "q": fields.get("q", ""), "options": options,
-                  "answer": answer, "multi": len(answer) > 1, "explanation": fields.get("explain", "")}
+            cp = {
+                "kind": "question",
+                "id": f"q{nq}",
+                "q": fields.get("q", ""),
+                "options": options,
+                "answer": answer,
+                "multi": len(answer) > 1,
+                "explanation": fields.get("explain", ""),
+            }
         else:
             if not fields.get("id") or not fields.get("run"):
                 raise SystemExit(f"{where}: every check needs `id:` and `run:`")
-            cp = {"kind": "check", "id": fields["id"], "title": fields.get("title", fields["id"]),
-                  "hint": fields.get("hint", ""), "manual": fields.get("manual") == "allowed"}
+            cp = {
+                "kind": "check",
+                "id": fields["id"],
+                "title": fields.get("title", fields["id"]),
+                "hint": fields.get("hint", ""),
+                "manual": fields.get("manual") == "allowed",
+            }
         if cp["id"] in seen:
             raise SystemExit(f"{where}: duplicate checkpoint id {cp['id']}")
         seen.add(cp["id"])
@@ -162,8 +179,7 @@ def build_flashcards():
 
 def build_cheatsheets():
     return [
-        {"id": f.stem, "title": title_of(f.read_text(encoding="utf-8"), f.stem),
-         "md": f.read_text(encoding="utf-8")}
+        {"id": f.stem, "title": title_of(f.read_text(encoding="utf-8"), f.stem), "md": f.read_text(encoding="utf-8")}
         for f in sorted((ROOT / "cheatsheets").glob("*.md"))
     ]
 
@@ -174,8 +190,7 @@ def main():
         "studyPlan": read("STUDY-PLAN.md"),
         "objectives": read("EXAM-OBJECTIVES.md"),
         "lessons": build_lessons(),
-        "exams": [build_exam(p.relative_to(ROOT).as_posix())
-                  for p in sorted((ROOT / "practice-exams").glob("*.md"))],
+        "exams": [build_exam(p.relative_to(ROOT).as_posix()) for p in sorted((ROOT / "practice-exams").glob("*.md"))],
         "flashcards": build_flashcards(),
         "cheatsheets": build_cheatsheets(),
     }
@@ -184,11 +199,13 @@ def main():
         "window.COURSE = " + json.dumps(content, ensure_ascii=False) + ";\n",
         encoding="utf-8",
     )
-    print(f"Wrote {OUT.relative_to(ROOT)}: {len(content['lessons'])} lessons, "
-          f"{sum(len(e['questions']) for e in content['exams'])} exam questions, "
-          f"{sum(len(l['quiz']) for l in content['lessons'])} quiz questions, "
-          f"{sum(len(l['labCheckpoints']) for l in content['lessons'])} lab checkpoints, "
-          f"{len(content['flashcards'])} flashcards, {len(content['cheatsheets'])} cheatsheets")
+    print(
+        f"Wrote {OUT.relative_to(ROOT)}: {len(content['lessons'])} lessons, "
+        f"{sum(len(e['questions']) for e in content['exams'])} exam questions, "
+        f"{sum(len(lesson['quiz']) for lesson in content['lessons'])} quiz questions, "
+        f"{sum(len(lesson['labCheckpoints']) for lesson in content['lessons'])} lab checkpoints, "
+        f"{len(content['flashcards'])} flashcards, {len(content['cheatsheets'])} cheatsheets"
+    )
 
 
 if __name__ == "__main__":
