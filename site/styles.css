@@ -444,3 +444,8 @@ pre.runnable { padding-left: 6px; }
 
 /* Terraform syntax must read literally: no `>=` → ≥ or `~>` → arrow ligatures in code, editor or terminal */
 code, pre, kbd, textarea, .xterm, .xterm * { font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }
+
+/* review questions from earlier lessons */
+.review-h { margin-top: 30px; }
+.quiz-q.review { border-left: 4px solid var(--warn); }
+.review-from { font-size: 11.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--warn); margin-bottom: 6px; }

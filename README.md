@@ -122,6 +122,8 @@ Labs contain **checkpoints**: `question` blocks (multiple choice about what you 
 (the lab server runs the check's command in your sandbox to verify the step, for example that a resource is in
 state or a file was changed). A lab is complete when every checkpoint passes. Without the lab server, checks
 can be confirmed by hand. Lessons unlock in order: read the lesson, pass its quiz (80%+) and complete its lab.
+From lesson 02 on, each quiz also includes review questions from earlier lessons' quizzes and labs (2 to 5,
+questions you missed before first), and they count towards the score.
 
 - Natively, it needs Linux, macOS or WSL, plus Terraform on your `PATH`. In Docker, sandboxes are in a volume instead of `.lab-workspace/`.
 - Listens on `127.0.0.1` only, and API calls need a per-run token, so other websites can't reach your shell.

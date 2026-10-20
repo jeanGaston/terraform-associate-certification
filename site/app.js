@@ -17,7 +17,7 @@
     load() { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } },
     save() { try { localStorage.setItem(KEY, JSON.stringify(P)); } catch { /* private mode */ } },
   };
-  const freshProgress = () => ({ lessons: {}, exams: {}, cards: {}, objectives: {}, quizzes: {}, labChecks: {}, run: null, last: null });
+  const freshProgress = () => ({ lessons: {}, exams: {}, cards: {}, objectives: {}, quizzes: {}, labChecks: {}, missed: {}, run: null, last: null });
   const P = Object.assign(freshProgress(), store.load());
   function resetProgress(epoch) {
     Object.keys(P).forEach((k) => delete P[k]);
@@ -376,59 +376,94 @@
   }
 
   /* ---------------- lesson review quizzes ---------------- */
+  // Review questions from earlier lessons: their quizzes plus the hands-on questions of their labs.
+  // Questions the learner missed before come first; the rest are spread across the earlier lessons.
+  function reviewQuestions(i) {
+    const count = Math.min(5, i + 1);
+    if (i === 0) return [];
+    const pool = C.lessons.slice(0, i).flatMap((pl) => [
+      ...pl.quiz.map((q) => ({ ...q, key: `${pl.id}:quiz:${q.n}`, from: `Lesson ${pl.num}` })),
+      ...pl.labCheckpoints.filter((c) => c.kind === "question").map((c) => ({ ...c, key: `${pl.id}:lab:${c.id}`, from: `Lab ${pl.num}` })),
+    ]);
+    const shuffled = pool.map((q) => [Math.random(), q]).sort((a, b) => a[0] - b[0]).map((x) => x[1]);
+    const chosen = shuffled.filter((q) => P.missed[q.key]).slice(0, count);
+    const perLesson = {};
+    chosen.forEach((q) => (perLesson[q.from.slice(-2)] = (perLesson[q.from.slice(-2)] || 0) + 1));
+    for (const q of shuffled) {
+      if (chosen.length >= count) break;
+      if (chosen.includes(q)) continue;
+      const least = Math.min(...C.lessons.slice(0, i).map((pl) => perLesson[pl.num] || 0));
+      if ((perLesson[q.from.slice(-2)] || 0) > least) continue; // keep the spread even
+      chosen.push(q); perLesson[q.from.slice(-2)] = (perLesson[q.from.slice(-2)] || 0) + 1;
+    }
+    for (const q of shuffled) { if (chosen.length >= count) break; if (!chosen.includes(q)) chosen.push(q); }
+    return chosen.map((q) => ({ ...q, review: true }));
+  }
+
   function renderQuiz(l, onScore) {
     const wrap = document.createElement("section");
     wrap.className = "quiz";
-    let answers = {}, checked = false;
+    const i = C.lessons.indexOf(l);
+    let qs, answers, checked;
+    const start = () => {
+      qs = [...l.quiz.map((q) => ({ ...q, key: `${l.id}:quiz:${q.n}` })), ...reviewQuestions(i)].map((q, idx) => ({ ...q, n: idx + 1 }));
+      answers = {}; checked = false;
+    };
+    start();
     const isRight = (q) => { const a = answers[q.n] || []; return a.length === q.answer.length && q.answer.every((k) => a.includes(k)); };
+    const question = (q) => {
+      const sel = answers[q.n] || [];
+      const need = q.multi ? ` <span class="pill accent">Select ${["", "ONE", "TWO", "THREE", "FOUR"][q.answer.length] || q.answer.length}</span>` : "";
+      return `<div class="quiz-q card${q.review ? " review" : ""}" data-n="${q.n}">
+        ${q.review ? `<div class="review-from">Review · ${esc(q.from)}${P.missed[q.key] ? " · you missed this before" : ""}</div>` : ""}
+        <div class="question"><span class="muted">${q.n}.</span> ${inline(q.q.replace(/\s*\*\(Select [A-Z]+\)\*\s*$/, ""))}${need}</div>
+        <div class="opts" role="${q.multi ? "group" : "radiogroup"}">${q.options.map((o) => {
+          let cls = sel.includes(o.key) ? " sel" : "";
+          if (checked) cls = q.answer.includes(o.key) ? " correct" : sel.includes(o.key) ? " incorrect" : "";
+          return `<button class="opt${q.multi ? " multi" : ""}${cls}" data-k="${o.key}" ${checked ? "disabled" : ""} role="${q.multi ? "checkbox" : "radio"}" aria-checked="${sel.includes(o.key)}"><span class="key">${o.key}</span><span>${inline(o.text)}</span></button>`;
+        }).join("")}</div>
+        ${checked ? `<div class="explain ${isRight(q) ? "ok" : "bad"}"><b>${isRight(q) ? "Correct." : `Answer: ${q.answer.join(", ")}.`}</b> ${inline(q.explanation)}</div>` : ""}
+      </div>`;
+    };
     const draw = () => {
-      const done = l.quiz.filter((q) => (answers[q.n] || []).length).length;
-      const correct = l.quiz.filter(isRight).length;
-      const score = pct(correct, l.quiz.length);
+      const own = qs.filter((q) => !q.review), review = qs.filter((q) => q.review);
+      const done = qs.filter((q) => (answers[q.n] || []).length).length;
+      const correct = qs.filter(isRight).length;
+      const score = pct(correct, qs.length);
       const r = P.quizzes[l.id];
       wrap.innerHTML = `
         <h2 id="review-quiz">Review quiz</h2>
-        <p class="muted">${l.quiz.length} questions. Answer them all, then check your score.${r ? ` Best so far: <b>${r.best}%</b>${r.attempts > 1 ? ` (${r.attempts} attempts)` : ""}.` : ""}</p>
+        <p class="muted">${own.length} questions on this lesson${review.length ? ` + ${review.length} from earlier lessons and labs` : ""}. Answer them all, then check your score.${r ? ` Best so far: <b>${r.best}%</b>${r.attempts > 1 ? ` (${r.attempts} attempts)` : ""}.` : ""}</p>
         ${checked ? `<div class="card quiz-score ${score >= 80 ? "ok" : score >= 60 ? "warn" : "bad"}"><div class="score-big">${score}%</div>
-          <div><b>${correct} of ${l.quiz.length} correct</b><br><span class="muted">${score === 100 ? "Perfect — on to the lab!" : score >= 80 ? "Solid. Review the explanations for the ones you missed." : "Re-read the sections behind the red answers, then try again."}</span></div></div>` : ""}
-        ${l.quiz.map((q) => {
-          const sel = answers[q.n] || [];
-          const need = q.multi ? ` <span class="pill accent">Select ${["", "ONE", "TWO", "THREE", "FOUR"][q.answer.length] || q.answer.length}</span>` : "";
-          return `<div class="quiz-q card" data-n="${q.n}">
-            <div class="question"><span class="muted">${q.n}.</span> ${inline(q.q.replace(/\s*\*\(Select [A-Z]+\)\*\s*$/, ""))}${need}</div>
-            <div class="opts" role="${q.multi ? "group" : "radiogroup"}">${q.options.map((o) => {
-              let cls = sel.includes(o.key) ? " sel" : "";
-              if (checked) cls = q.answer.includes(o.key) ? " correct" : sel.includes(o.key) ? " incorrect" : "";
-              return `<button class="opt${q.multi ? " multi" : ""}${cls}" data-k="${o.key}" ${checked ? "disabled" : ""} role="${q.multi ? "checkbox" : "radio"}" aria-checked="${sel.includes(o.key)}"><span class="key">${o.key}</span><span>${inline(o.text)}</span></button>`;
-            }).join("")}</div>
-            ${checked ? `<div class="explain ${isRight(q) ? "ok" : "bad"}"><b>${isRight(q) ? "Correct." : `Answer: ${q.answer.join(", ")}.`}</b> ${inline(q.explanation)}</div>` : ""}
-          </div>`;
-        }).join("")}
+          <div><b>${correct} of ${qs.length} correct</b>${review.length ? ` <span class="muted">(review: ${review.filter(isRight).length}/${review.length})</span>` : ""}<br><span class="muted">${score === 100 ? "Perfect — on to the lab!" : score >= 80 ? "Solid. Review the explanations for the ones you missed." : "Re-read the sections behind the red answers, then try again."}</span></div></div>` : ""}
+        ${own.map(question).join("")}
+        ${review.length ? `<h3 class="review-h">From previous lessons</h3><p class="muted" style="margin-top:0">Questions you missed before come back here until you get them right. They count towards your score.</p>${review.map(question).join("")}` : ""}
         <div class="row quiz-actions">
-          ${checked ? `<button class="btn primary" data-act="retry">Try again</button>`
-            : `<button class="btn primary" data-act="check" ${done < l.quiz.length ? "disabled" : ""}>Check answers</button><span class="muted">${done} of ${l.quiz.length} answered</span>`}
+          ${checked ? `<button class="btn primary" data-act="retry">Try again${review.length ? " (new review questions)" : ""}</button>`
+            : `<button class="btn primary" data-act="check" ${done < qs.length ? "disabled" : ""}>Check answers</button><span class="muted">${done} of ${qs.length} answered</span>`}
         </div>`;
     };
     wrap.addEventListener("click", (e) => {
       const opt = e.target.closest(".opt");
       if (opt && !checked) {
-        const q = l.quiz.find((x) => x.n === +opt.closest(".quiz-q").dataset.n), k = opt.dataset.k, a = answers[q.n] || [];
+        const q = qs.find((x) => x.n === +opt.closest(".quiz-q").dataset.n), k = opt.dataset.k, a = answers[q.n] || [];
         answers[q.n] = q.multi ? (a.includes(k) ? a.filter((x) => x !== k) : [...a, k].sort()) : [k];
         const y = window.scrollY; draw(); window.scrollTo(0, y);
         return;
       }
       const act = e.target.closest("[data-act]")?.dataset.act;
       if (act === "check") {
-        checked = true;
         const wasDone = lessonDone(l);
-        const score = pct(l.quiz.filter(isRight).length, l.quiz.length);
+        const score = pct(qs.filter(isRight).length, qs.length);
+        qs.forEach((q) => { if (isRight(q)) delete P.missed[q.key]; else P.missed[q.key] = true; });
+        checked = true;
         const r = P.quizzes[l.id] || { best: 0, attempts: 0 };
         P.quizzes[l.id] = { best: Math.max(r.best, score), last: score, attempts: r.attempts + 1, date: Date.now() };
         store.save(); draw(); onScore?.(wasDone);
         $(".quiz-score", wrap)?.scrollIntoView({ behavior: "smooth", block: "center" });
         if (score === 100) toast("Perfect score 🎉");
       } else if (act === "retry") {
-        answers = {}; checked = false; draw();
+        start(); draw();
         $("#review-quiz").scrollIntoView({ behavior: "smooth" });
       }
     });
