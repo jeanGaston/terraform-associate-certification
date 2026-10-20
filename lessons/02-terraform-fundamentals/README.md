@@ -141,23 +141,61 @@ Facts to memorize:
 
 ## Review quiz
 
-1. What does `~> 5.4.0` allow? And `~> 5.4`?
-2. Which file records exact provider versions and should be committed to Git?
-3. Which command upgrades providers to the newest versions allowed by constraints?
-4. How do you make a resource use a non-default provider configuration?
-5. Does the lock file track module versions?
-6. What is the default source hostname for providers?
-7. Name the three main provider tiers.
+Pick the best answer for each question. Answers and explanations are at the bottom;
+on the training website this quiz is interactive and scored.
+
+**1.** A provider constraint is `~> 5.4.0`. Which versions does it allow?
+- A. `>= 5.4.0, < 6.0.0`
+- B. `>= 5.4.0, < 5.5.0`
+- C. Exactly `5.4.0`
+- D. `>= 5.4.0` with no upper bound
+
+**2.** Which file records the exact provider versions and checksums and should be committed to Git?
+- A. `terraform.tfstate`
+- B. `.terraform.lock.hcl`
+- C. `.terraform/`
+- D. `terraform.tfvars`
+
+**3.** Which command upgrades providers to the newest versions allowed by your constraints?
+- A. `terraform get -update`
+- B. `terraform init -upgrade`
+- C. `terraform providers upgrade`
+- D. `terraform apply -upgrade`
+
+**4.** How do you make a resource use a non-default provider configuration?
+- A. Declare the provider with `alias = "west"`, then set `provider = aws.west` on the resource
+- B. Set `region = "west"` directly on the resource
+- C. Declare a second `terraform {}` block
+- D. Add `depends_on = [provider.aws.west]` to the resource
+
+**5.** Does the dependency lock file track module versions?
+- A. Yes
+- B. No
+
+**6.** What is the default source hostname for providers?
+- A. `github.com`
+- B. `registry.terraform.io`
+- C. `releases.hashicorp.com`
+- D. `app.terraform.io`
+
+**7.** Which are provider tiers in the Terraform Registry? *(Select THREE)*
+- A. Official
+- B. Partner
+- C. Community
+- D. Enterprise
+- E. Certified
 
 <details><summary>Answers</summary>
 
-1. `~> 5.4.0` → `>= 5.4.0, < 5.5.0`. `~> 5.4` → `>= 5.4, < 6.0`.
-2. `.terraform.lock.hcl`.
-3. `terraform init -upgrade`.
-4. Declare the provider with `alias = "x"`, then set `provider = <name>.x` on the resource.
-5. No — providers only.
-6. `registry.terraform.io`.
-7. Official, Partner, Community.
+| # | Ans | Explanation |
+|---|---|---|
+| 1 | B | `~>` lets only the right-most specified component increase. `~> 5.4.0` means `>= 5.4.0, < 5.5.0`, while `~> 5.4` means `>= 5.4, < 6.0`. |
+| 2 | B | The dependency lock file. `.terraform/` is a local cache and should be gitignored. |
+| 3 | B | `init -upgrade` ignores the locked versions and picks the newest allowed ones, then rewrites the lock file. `get -update` only updates modules. |
+| 4 | A | Aliased provider configurations are selected with the `provider` meta-argument (or the `providers` map for modules). |
+| 5 | B | It tracks providers only. Pin modules with a `version` constraint (registry) or `?ref=` (Git). |
+| 6 | B | `hashicorp/aws` is shorthand for `registry.terraform.io/hashicorp/aws`. |
+| 7 | A, B, C | Official (HashiCorp), Partner (technology partners) and Community (individuals). Deprecated providers are marked Archived. |
 </details>
 
 ➡️ Lab: [lab/LAB.md](lab/LAB.md)

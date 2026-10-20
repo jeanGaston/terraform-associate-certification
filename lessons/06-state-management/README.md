@@ -162,29 +162,81 @@ How Terraform handles it:
 
 ## Review quiz
 
-1. Where does the local backend store state by default?
-2. Can you use `var.bucket_name` inside a `backend "s3"` block?
-3. What happens after you change the backend block and run `terraform plan` without `init`?
-4. Which command releases a stuck lock?
-5. What's the safe way to accept manual changes into state without modifying infrastructure?
-6. How do you stop managing a resource without destroying it (two ways)?
-7. What replaced `terraform taint`?
-8. Which values from another state can `terraform_remote_state` read?
-9. Does `terraform state rm` delete the real resource?
-10. Which state file field increments on every write?
+Pick the best answer for each question. Answers and explanations are at the bottom;
+on the training website this quiz is interactive and scored.
+
+**1.** Where does the local backend store state by default?
+- A. `~/.terraform.d/terraform.tfstate`
+- B. `terraform.tfstate` in the root module's working directory
+- C. `.terraform/terraform.tfstate`
+- D. In HCP Terraform
+
+**2.** Can you use `var.bucket_name` inside a `backend "s3"` block?
+- A. Yes
+- B. Yes, but only if the variable has a default
+- C. No — backend blocks can't reference variables; use partial configuration with `-backend-config`
+- D. Only through a `locals` block
+
+**3.** You change the backend block and run `terraform plan` without running `init`. What happens?
+- A. The plan runs against the old backend
+- B. Terraform migrates the state automatically
+- C. An error says the backend configuration changed and asks you to run `terraform init`
+- D. The state is deleted
+
+**4.** Which command releases a stuck state lock?
+- A. `terraform unlock`
+- B. `terraform force-unlock LOCK_ID`
+- C. `terraform state unlock`
+- D. Deleting the `.terraform` directory
+
+**5.** What is the safe way to accept manual changes into state without modifying infrastructure?
+- A. `terraform apply -refresh-only`
+- B. `terraform apply -auto-approve`
+- C. `terraform import`
+- D. `terraform state push`
+
+**6.** How can you stop managing a resource without destroying it? *(Select TWO)*
+- A. `terraform state rm`
+- B. A `removed` block with `lifecycle { destroy = false }`
+- C. `terraform destroy -target`
+- D. Delete the resource block and run `terraform apply`
+
+**7.** What replaced `terraform taint`?
+- A. `terraform apply -replace=ADDR`
+- B. `terraform state mv`
+- C. `terraform refresh`
+- D. `terraform untaint`
+
+**8.** Which values can `terraform_remote_state` read from another configuration?
+- A. Every resource attribute
+- B. Only the root module outputs
+- C. Its input variables
+- D. Outputs of any module, including child modules
+
+**9.** Does `terraform state rm` delete the real resource?
+- A. Yes
+- B. No
+
+**10.** Which state file field increments on every write?
+- A. `lineage`
+- B. `serial`
+- C. `version`
+- D. `terraform_version`
 
 <details><summary>Answers</summary>
 
-1. `terraform.tfstate` in the root module (working) directory.
-2. No — backend config can't reference variables; use partial configuration with `-backend-config`.
-3. Error: backend configuration changed, run `terraform init` (with `-migrate-state` or `-reconfigure`).
-4. `terraform force-unlock LOCK_ID`.
-5. `terraform apply -refresh-only`.
-6. `removed { from = ... lifecycle { destroy = false } }` block, or `terraform state rm`.
-7. `terraform apply -replace=ADDR`.
-8. Only the root module outputs.
-9. No.
-10. `serial`.
+| # | Ans | Explanation |
+|---|---|---|
+| 1 | B | The default local backend writes `terraform.tfstate` next to your configuration (CLI workspaces use `terraform.tfstate.d/`). |
+| 2 | C | The backend is configured before variables are evaluated, so it can't use variables, locals or data sources. |
+| 3 | C | Run `terraform init -migrate-state` to move the state, or `-reconfigure` to start fresh. |
+| 4 | B | Only use it for stale locks left by crashed processes, never while another run is active. |
+| 5 | A | A refresh-only run updates state to match reality and shows you what changed before you approve it. |
+| 6 | A, B | Both forget the object while leaving it running. Deleting the block and applying would destroy it. |
+| 7 | A | `-replace` forces replacement as part of a normal plan, so you see the impact before applying. |
+| 8 | B | Only root-level outputs are exposed. Child module outputs must be re-exported by the root module. |
+| 9 | B | It only removes the object from state; the infrastructure keeps running unmanaged. |
+| 10 | B | `serial` increases with each write. `lineage` is a unique ID set when the state is first created. |
 </details>
 
 ➡️ Lab: [lab/LAB.md](lab/LAB.md)

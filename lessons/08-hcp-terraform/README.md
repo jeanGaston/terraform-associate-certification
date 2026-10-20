@@ -124,29 +124,83 @@ policy enforcement at scale, run tasks, agents, SSO, and audit logging. Details 
 
 ## Review quiz
 
-1. Which command stores an API token for HCP Terraform?
-2. What block connects a configuration to HCP Terraform?
-3. What's the difference between an HCP Terraform workspace and a CLI workspace?
-4. When are Sentinel policies evaluated?
-5. Which enforcement level can never be overridden?
-6. What kind of run is triggered by a pull request in a VCS-connected workspace?
-7. Which feature lets many workspaces share the same cloud credentials variables?
-8. What lets HCP Terraform runs reach infrastructure in a private network?
-9. What groups workspaces for easier permission management?
-10. Which HCP Terraform feature periodically detects drift?
+Pick the best answer for each question. Answers and explanations are at the bottom;
+on the training website this quiz is interactive and scored.
+
+**1.** Which command stores an API token for HCP Terraform?
+- A. `terraform login`
+- B. `terraform auth`
+- C. `terraform init -token`
+- D. `terraform cloud connect`
+
+**2.** Which block connects a configuration to HCP Terraform?
+- A. `backend "hcp" {}`
+- B. `cloud {}` inside the `terraform` block
+- C. `provider "tfe" {}`
+- D. `hcp {}`
+
+**3.** What does an HCP Terraform workspace hold that a CLI workspace does NOT? *(Select TWO)*
+- A. State
+- B. Variables
+- C. Team access permissions
+- D. A working directory
+
+**4.** When are Sentinel or OPA policies evaluated in a run?
+- A. Before the plan
+- B. After the plan, before the apply
+- C. After the apply
+- D. Only on destroy runs
+
+**5.** Which policy enforcement level can never be overridden?
+- A. Advisory
+- B. Soft-mandatory
+- C. Hard-mandatory
+- D. Mandatory-override
+
+**6.** What kind of run does a pull request trigger in a VCS-connected workspace?
+- A. An apply
+- B. A speculative plan (plan-only)
+- C. A destroy plan
+- D. A refresh-only run
+
+**7.** Which feature lets many workspaces share the same cloud credential variables?
+- A. Variable sets
+- B. Projects
+- C. Run triggers
+- D. The private registry
+
+**8.** What lets HCP Terraform runs reach infrastructure in a private network?
+- A. HCP Terraform agents (agent execution mode)
+- B. Variable sets
+- C. Sentinel policies
+- D. Health assessments
+
+**9.** What groups workspaces for easier permission management?
+- A. Projects
+- B. Variable sets
+- C. Policy sets
+- D. Run triggers
+
+**10.** Which HCP Terraform feature periodically detects drift?
+- A. Health assessments
+- B. Run triggers
+- C. Speculative plans
+- D. Sentinel
 
 <details><summary>Answers</summary>
 
-1. `terraform login`.
-2. `terraform { cloud { ... } }`.
-3. HCP workspace holds state, variables, permissions, settings and run history; a CLI workspace is only a separate state.
-4. After plan, before apply.
-5. Hard-mandatory.
-6. A speculative plan (plan-only).
-7. Variable sets.
-8. HCP Terraform agents (agent execution mode).
-9. Projects.
-10. Health assessments (drift detection).
+| # | Ans | Explanation |
+|---|---|---|
+| 1 | A | The token is saved to `~/.terraform.d/credentials.tfrc.json`. |
+| 2 | B | `terraform { cloud { organization = "..." workspaces { ... } } }`. The `tfe` provider *manages* HCP Terraform; it doesn't connect a configuration to it. |
+| 3 | B, C | A CLI workspace is only a separate state. HCP workspaces also hold variables, permissions, settings and run history. |
+| 4 | B | Policies check the plan, so a violation can stop the apply. |
+| 5 | C | Advisory only warns, and soft-mandatory can be overridden by authorized users. |
+| 6 | B | Speculative plans show the impact in the PR and can never be applied. Merging triggers the real run. |
+| 7 | A | A variable set is applied to many workspaces or projects at once. |
+| 8 | A | Agents run inside your network and poll HCP Terraform for work, so no inbound access is needed. |
+| 9 | A | Teams can be granted access to a whole project instead of workspace by workspace. |
+| 10 | A | Health assessments run refresh-only checks on a schedule and report drift and failing `check` blocks. |
 </details>
 
 ➡️ Lab: [lab/LAB.md](lab/LAB.md)

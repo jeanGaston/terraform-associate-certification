@@ -104,25 +104,65 @@ module.app.url ◀──────────────── output "url" 
 
 ## Review quiz
 
-1. What's the minimum requirement for something to be a Terraform module?
-2. How does a parent read a value from a child module named `network`?
-3. Can a child module read the parent's `var.region` automatically?
-4. You pin a GitHub module source with `version = "1.2.0"`. Does it work?
-5. Which command must you run after adding a new module block?
-6. Registry source format?
-7. Naming format for a public registry module repo?
-8. Are module versions tracked in `.terraform.lock.hcl`?
+Pick the best answer for each question. Answers and explanations are at the bottom;
+on the training website this quiz is interactive and scored.
+
+**1.** What is the minimum requirement for something to be a Terraform module?
+- A. A directory containing `.tf` files
+- B. An entry in the Terraform Registry
+- C. A Git repository with a version tag
+- D. A `module` block with `source` and `version`
+
+**2.** How does a parent module read a value from a child module named `network`?
+- A. `module.network.<output_name>`
+- B. `network.<variable_name>`
+- C. `var.network.<name>`
+- D. `data.module.network.<name>`
+
+**3.** Can a child module read the parent's `var.region` automatically?
+- A. Yes
+- B. No
+
+**4.** You set `version = "1.2.0"` on a module whose source is a GitHub URL. What happens?
+- A. It works like a registry module
+- B. It doesn't work: `version` is only for registry sources, so use `?ref=v1.2.0` in the source
+- C. It works only if the repository is public
+- D. It works only after `terraform init -upgrade`
+
+**5.** Which command must you run after adding a new `module` block?
+- A. `terraform validate`
+- B. `terraform init` (or `terraform get`)
+- C. `terraform refresh`
+- D. `terraform fmt`
+
+**6.** What is the source format for a module from the public registry?
+- A. `<NAMESPACE>/<NAME>/<PROVIDER>`
+- B. `<PROVIDER>/<NAMESPACE>/<NAME>`
+- C. `github.com/<org>/<repo>`
+- D. `<NAME>@<VERSION>`
+
+**7.** How must a GitHub repository be named to publish it as a public registry module?
+- A. `terraform-<PROVIDER>-<NAME>`
+- B. `tf-module-<NAME>`
+- C. `<NAME>-terraform-module`
+- D. `terraform-module-<NAME>-<PROVIDER>`
+
+**8.** Are module versions tracked in `.terraform.lock.hcl`?
+- A. Yes
+- B. No
 
 <details><summary>Answers</summary>
 
-1. A directory containing `.tf` files.
-2. Via an output: `module.network.<output_name>`.
-3. No — it must be passed as an input variable.
-4. No — `version` is only for registry sources; use `?ref=v1.2.0`.
-5. `terraform init` (or `terraform get`).
-6. `<NAMESPACE>/<NAME>/<PROVIDER>` (with optional hostname prefix for private registries).
-7. `terraform-<PROVIDER>-<NAME>`.
-8. No.
+| # | Ans | Explanation |
+|---|---|---|
+| 1 | A | Every directory of `.tf` files is a module. The one you run Terraform in is the root module. |
+| 2 | A | Only values the child declares as `output`s are exposed to the parent. |
+| 3 | B | Modules are isolated: values must be passed in explicitly as input variables. |
+| 4 | B | For Git sources, select a tag, branch or commit with the `ref` query parameter. |
+| 5 | B | New modules have to be installed into `.terraform/modules` before plan or validate can use them. |
+| 6 | A | For example `terraform-aws-modules/vpc/aws`. Private registries add a hostname prefix. |
+| 7 | A | For example `terraform-aws-vpc`. The repo also needs a standard module structure and semantic version tags. |
+| 8 | B | The lock file only covers providers. Pin module versions in the `module` block. |
 </details>
 
 ➡️ Lab: [lab/LAB.md](lab/LAB.md)

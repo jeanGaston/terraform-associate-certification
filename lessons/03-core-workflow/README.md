@@ -123,25 +123,67 @@ Useful flags:
 
 ## Review quiz
 
-1. Which command downloads providers and modules?
-2. Does `terraform validate` check whether an AMI ID exists?
-3. Which `fmt` flag is used in CI to fail the pipeline on unformatted code?
-4. What does `-/+` mean in plan output?
-5. You ran `terraform plan -out=tfplan`. What happens with `terraform apply tfplan`?
-6. What is the default value of `-parallelism`?
-7. An apply fails after creating 3 of 5 resources. What happens to the 3?
-8. What's the equivalent of `terraform destroy` using `apply`?
+Pick the best answer for each question. Answers and explanations are at the bottom;
+on the training website this quiz is interactive and scored.
+
+**1.** Which command downloads the providers and modules a configuration needs?
+- A. `terraform plan`
+- B. `terraform init`
+- C. `terraform validate`
+- D. `terraform fmt`
+
+**2.** Does `terraform validate` check whether an AMI ID actually exists?
+- A. Yes
+- B. No
+
+**3.** Which `fmt` flag makes a CI pipeline fail when code isn't formatted?
+- A. `-diff`
+- B. `-check`
+- C. `-write=true`
+- D. `-list`
+
+**4.** What does `-/+` mean in plan output?
+- A. The resource is updated in place
+- B. The resource is destroyed, then re-created (replacement)
+- C. The resource is created first, then the old one destroyed
+- D. A data source is read
+
+**5.** You ran `terraform plan -out=tfplan`. What does `terraform apply tfplan` do?
+- A. Re-plans and asks for confirmation
+- B. Applies exactly that saved plan, without a confirmation prompt
+- C. Fails, because saved plans can only be shown
+- D. Applies only after re-running `validate`
+
+**6.** What is the default value of `-parallelism`?
+- A. 1
+- B. 5
+- C. 10
+- D. Unlimited
+
+**7.** An apply fails after creating 3 of 5 resources. What happens to the 3?
+- A. Terraform automatically destroys them (rollback)
+- B. They remain and are recorded in state
+- C. They remain but are not recorded in state
+- D. The state is reverted to its pre-apply version
+
+**8.** Which command is equivalent to `terraform destroy`?
+- A. `terraform apply -destroy`
+- B. `terraform plan -destroy`
+- C. `terraform apply -delete`
+- D. `terraform state rm -all`
 
 <details><summary>Answers</summary>
 
-1. `terraform init` (also `terraform get` for modules only).
-2. No — validate never contacts remote APIs.
-3. `terraform fmt -check` (often with `-recursive`).
-4. The resource will be destroyed then re-created (replacement).
-5. It applies exactly that plan, **without** a confirmation prompt.
-6. 10.
-7. They remain and are recorded in state; there is no automatic rollback.
-8. `terraform apply -destroy`.
+| # | Ans | Explanation |
+|---|---|---|
+| 1 | B | `init` installs providers and modules and configures the backend. `terraform get` fetches modules only. |
+| 2 | B | `validate` is offline: it checks syntax and internal consistency, never remote APIs or credentials. |
+| 3 | B | `-check` exits non-zero if any file needs formatting, without modifying files. Often combined with `-recursive`. |
+| 4 | B | `-/+` is a replacement. `+/-` is create-before-destroy, `~` is update in place, `<=` is a data source read. |
+| 5 | B | A saved plan was already reviewed, so Terraform applies it as-is without prompting. |
+| 6 | C | Terraform walks the graph with up to 10 concurrent operations by default. |
+| 7 | B | There is no rollback. Fix the error and apply again; Terraform continues from what the state records. |
+| 8 | A | `destroy` is an alias for `apply -destroy`. `plan -destroy` only previews the destruction. |
 </details>
 
 ➡️ Lab: [lab/LAB.md](lab/LAB.md)

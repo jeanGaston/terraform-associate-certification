@@ -91,19 +91,47 @@ What you keep is the *workflow*, language, and tooling.
 
 ## Review quiz
 
-1. Is Terraform declarative or imperative? What does that mean?
-2. Name four benefits of IaC.
-3. True/False: A Terraform configuration written for AWS can be applied to Azure by changing the provider.
-4. What component translates Terraform resources into platform API calls?
-5. Which is the self-hosted version of HCP Terraform?
+Pick the best answer for each question. Answers and explanations are at the bottom;
+on the training website this quiz is interactive and scored.
+
+**1.** Is Terraform declarative or imperative?
+- A. Imperative — you script each API call in the order it must run
+- B. Declarative — you describe the desired end state and Terraform works out the steps
+- C. Procedural — you write functions that are executed top to bottom
+- D. Agent-based — an agent on each server pulls its configuration
+
+**2.** Which are benefits of Infrastructure as Code? *(Select THREE)*
+- A. Changes can be reviewed and tracked in version control
+- B. Environments can be reproduced consistently
+- C. You no longer need to understand the target platform
+- D. Changes can be previewed with a plan before they are applied
+- E. Cloud provider bills are eliminated
+
+**3.** True or False: a Terraform configuration written for AWS can be applied to Azure just by changing the provider.
+- A. True
+- B. False
+
+**4.** Which component translates Terraform resources into platform API calls?
+- A. The state file
+- B. A provider (plugin)
+- C. The backend
+- D. A module
+
+**5.** Which is the self-hosted version of HCP Terraform?
+- A. Terraform CLI
+- B. Terraform Enterprise
+- C. HCP Terraform agents
+- D. The Terraform Registry
 
 <details><summary>Answers</summary>
 
-1. Declarative — you describe the desired end state and Terraform works out the steps.
-2. Any four of: version control, repeatability, automation, self-documentation, collaboration, reuse, reduced risk via plan, consistency across environments.
-3. **False** — resource types are provider-specific. The *workflow* is portable, the code is not.
-4. A **provider** (plugin).
-5. **Terraform Enterprise**.
+| # | Ans | Explanation |
+|---|---|---|
+| 1 | B | You declare *what* you want; Terraform builds the dependency graph and decides *how* and in what order. |
+| 2 | A, B, D | Other benefits: automation, self-documentation, collaboration and reuse. IaC doesn't remove costs or the need to know the platform. |
+| 3 | B | Resource types are provider-specific (`aws_instance` vs `azurerm_linux_virtual_machine`). The *workflow* is portable, the code is not. |
+| 4 | B | Providers are plugins that know how to talk to one platform's API. State records what exists, backends store state, modules group configuration. |
+| 5 | B | Terraform Enterprise is the self-hosted distribution. Agents only run workloads inside your network; the platform itself stays SaaS. |
 </details>
 
 ➡️ Lab: [lab/LAB.md](lab/LAB.md)

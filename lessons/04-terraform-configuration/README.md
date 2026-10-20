@@ -358,29 +358,79 @@ check "health" {
 
 ## Review quiz
 
-1. How do you reference the `id` of a data source `aws_vpc.main`?
-2. A variable is set by `default`, `TF_VAR_`, `terraform.tfvars` and `-var`. Which wins?
-3. What's the difference between `list` and `set`?
-4. Which meta-argument would you use to create 3 users named alice, bob, carol with stable addresses?
-5. When should you use `depends_on`?
-6. What does `lifecycle { create_before_destroy = true }` do?
-7. Which custom condition type produces only a warning?
-8. Does `sensitive = true` keep a value out of the state file?
-9. What's the name of the iterator in `dynamic "setting" { ... }`?
-10. Can you write your own functions in HCL?
+Pick the best answer for each question. Answers and explanations are at the bottom;
+on the training website this quiz is interactive and scored.
+
+**1.** How do you reference the `id` of the data source `aws_vpc.main`?
+- A. `aws_vpc.main.id`
+- B. `data.aws_vpc.main.id`
+- C. `data.main.id`
+- D. `var.aws_vpc.main.id`
+
+**2.** A variable is set by its `default`, `TF_VAR_`, `terraform.tfvars` and `-var`. Which value wins?
+- A. `default`
+- B. The `TF_VAR_` environment variable
+- C. `terraform.tfvars`
+- D. `-var` on the command line
+
+**3.** Which statement describes a `set`?
+- A. Ordered, allows duplicates, accessed by index
+- B. Unordered, unique values, no index access
+- C. A collection of values keyed by strings
+- D. A fixed-length sequence where each position has its own type
+
+**4.** You need 3 users named alice, bob and carol, with addresses that stay stable if one is removed. Which meta-argument?
+- A. `count = 3`
+- B. `for_each = toset(["alice", "bob", "carol"])`
+- C. A `dynamic` block
+- D. `depends_on`
+
+**5.** When should you use `depends_on`?
+- A. On every resource, to control ordering
+- B. Only for hidden dependencies Terraform can't infer from references
+- C. To make resources run in parallel
+- D. To read outputs from a module
+
+**6.** What does `lifecycle { create_before_destroy = true }` do?
+- A. Creates the replacement before destroying the old object
+- B. Prevents the resource from ever being destroyed
+- C. Ignores changes made outside Terraform
+- D. Destroys the old object first, then creates the new one
+
+**7.** Which custom condition only produces a warning, never an error?
+- A. `precondition`
+- B. `postcondition`
+- C. A `check` block
+- D. A variable `validation` block
+
+**8.** True or False: `sensitive = true` keeps a value out of the state file.
+- A. True
+- B. False
+
+**9.** In `dynamic "setting" { ... }`, what is the iterator called by default?
+- A. `each`
+- B. `setting`
+- C. `iterator`
+- D. `item`
+
+**10.** True or False: you can write your own functions in HCL.
+- A. True
+- B. False
 
 <details><summary>Answers</summary>
 
-1. `data.aws_vpc.main.id`.
-2. `-var` on the command line.
-3. Lists are ordered and allow duplicates; sets are unordered, unique, and have no index access.
-4. `for_each = toset(["alice","bob","carol"])`.
-5. Only for hidden dependencies Terraform can't infer from references.
-6. Creates the replacement before destroying the old one (avoids downtime).
-7. `check` blocks.
-8. **No** — only redacts output. Use `ephemeral` or write-only args to avoid persisting.
-9. `setting` (unless renamed with `iterator`).
-10. No — only built-in functions (plus provider-defined functions).
+| # | Ans | Explanation |
+|---|---|---|
+| 1 | B | Data sources are always prefixed with `data.`: `data.TYPE.NAME.ATTRIBUTE`. |
+| 2 | D | Precedence, lowest to highest: default, environment, `terraform.tfvars`, `*.auto.tfvars`, then `-var`/`-var-file` on the CLI. |
+| 3 | B | That's a set. Ordered with duplicates is a `list`, string-keyed is a `map`, fixed-length positional is a `tuple`. |
+| 4 | B | `for_each` keys instances by value (`aws_iam_user.u["bob"]`). With `count`, removing bob would shift carol's index and force a replacement. |
+| 5 | B | References already create implicit dependencies. `depends_on` is a last resort for dependencies that aren't visible in the configuration. |
+| 6 | A | It flips the default replacement order to avoid downtime. `prevent_destroy` blocks destruction; `ignore_changes` ignores drift. |
+| 7 | C | `check` block assertions report warnings. Preconditions, postconditions and validations stop the run. |
+| 8 | B | It only redacts the value in CLI output. Use ephemeral values or write-only arguments to avoid persisting secrets. |
+| 9 | B | The iterator takes the block's label (`setting.key`, `setting.value`) unless renamed with the `iterator` argument. `each` belongs to `for_each`. |
+| 10 | B | Only built-in functions are available, plus functions provided by providers. |
 </details>
 
 ➡️ Lab: [lab/LAB.md](lab/LAB.md)

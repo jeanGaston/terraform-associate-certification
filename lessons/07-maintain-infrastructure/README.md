@@ -101,25 +101,67 @@ unset TF_LOG TF_LOG_PATH
 
 ## Review quiz
 
-1. Which flag generates HCL for resources in `import` blocks?
-2. Does `terraform import` (CLI) write the resource configuration for you?
-3. What does import modify: the real resource, the state, or both?
-4. Most verbose log level?
-5. You set `TF_LOG_PATH=tf.log` but no file appears. Why?
-6. Name of the file written when Terraform panics?
-7. Which command shows all attributes of `aws_s3_bucket.logs` from state?
-8. After importing, how do you confirm your configuration matches the real object?
+Pick the best answer for each question. Answers and explanations are at the bottom;
+on the training website this quiz is interactive and scored.
+
+**1.** Which command generates HCL for resources declared in `import` blocks?
+- A. `terraform import -generate`
+- B. `terraform plan -generate-config-out=generated.tf`
+- C. `terraform init -import`
+- D. `terraform show -config`
+
+**2.** Does the `terraform import` CLI command write the resource configuration for you?
+- A. Yes
+- B. No
+
+**3.** What does an import modify?
+- A. The real resource
+- B. Only the state
+- C. Both the real resource and the state
+- D. The configuration and the state
+
+**4.** What is the most verbose log level?
+- A. `DEBUG`
+- B. `TRACE`
+- C. `INFO`
+- D. `ALL`
+
+**5.** You set `TF_LOG_PATH=tf.log` but no file appears. Why?
+- A. `TF_LOG` isn't set, and `TF_LOG_PATH` has no effect without it
+- B. The path must be absolute
+- C. Logging only works in HCP Terraform
+- D. You also need the `-verbose` flag
+
+**6.** Which file does Terraform write when it panics?
+- A. `panic.log`
+- B. `crash.log`
+- C. `terraform.log`
+- D. `error.tfstate`
+
+**7.** Which command shows all the attributes of `aws_s3_bucket.logs` from state?
+- A. `terraform show aws_s3_bucket.logs`
+- B. `terraform state show aws_s3_bucket.logs`
+- C. `terraform state list aws_s3_bucket.logs`
+- D. `terraform output aws_s3_bucket.logs`
+
+**8.** After an import, how do you confirm your configuration matches the real object?
+- A. Run `terraform plan` and expect no changes
+- B. Run `terraform validate`
+- C. Run `terraform state pull`
+- D. Run `terraform fmt`
 
 <details><summary>Answers</summary>
 
-1. `terraform plan -generate-config-out=<file>.tf`.
-2. No.
-3. Only the state.
-4. `TRACE`.
-5. `TF_LOG` isn't set — `TF_LOG_PATH` has no effect without it.
-6. `crash.log`.
-7. `terraform state show aws_s3_bucket.logs`.
-8. Run `terraform plan` and expect no changes.
+| # | Ans | Explanation |
+|---|---|---|
+| 1 | B | Review and clean up the generated file before applying. |
+| 2 | B | You must write the resource block yourself. Only `import` blocks with `-generate-config-out` can generate it. |
+| 3 | B | Import records an existing object in state. It never changes the infrastructure. |
+| 4 | B | From most to least verbose: TRACE, DEBUG, INFO, WARN, ERROR. |
+| 5 | A | Set a level such as `TF_LOG=DEBUG` as well. |
+| 6 | B | `crash.log` holds the debug log and stack trace to attach to a bug report. |
+| 7 | B | `state show ADDR` prints one resource. `state list` lists addresses only; `terraform show` takes a plan or state file, not an address. |
+| 8 | A | Any planned change means your configuration still differs from the imported object. |
 </details>
 
 ➡️ Lab: [lab/LAB.md](lab/LAB.md)
