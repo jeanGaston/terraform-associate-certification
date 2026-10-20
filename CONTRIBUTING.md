@@ -29,6 +29,8 @@ step) or **Bug** (the website, lab server or Docker image misbehaves).
    python3 scripts/build-site.py     # rebuilds site/content.js and validates quizzes, exams and lab checkpoints
    ./scripts/validate-labs.sh        # only if you changed a lab: terraform fmt/init/validate on every lab
    ```
+   CI runs these plus secret scanning and linters for Python, shell, the Dockerfile and workflows.
+   The [README](README.md#development) shows how to run each one locally.
 4. Try it in the website (`python3 scripts/lab-server.py`, or `docker compose up -d --build`).
 5. Commit, including the regenerated `site/content.js`, and open a pull request. Commit messages follow
    [Conventional Commits](https://www.conventionalcommits.org/), for example `fix(lesson-04): correct the

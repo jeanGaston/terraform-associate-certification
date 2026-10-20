@@ -178,6 +178,20 @@ Objectives, product version and pricing can change: check the
 python3 scripts/build-site.py          # regenerate site/content.js after editing any Markdown
 ```
 
+The [Checks workflow](.github/workflows/checks.yml) runs on every push and pull request. Each check also runs
+locally (only Docker and Terraform needed):
+
+| Check | What it verifies | Run it locally |
+|---|---|---|
+| Secrets | No credentials anywhere in the git history (gitleaks) | `docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.24.3 git /repo` |
+| Python | Lint and formatting of `scripts/` (ruff, settings in `ruff.toml`) | `docker run --rm -u "$(id -u)" -v "$PWD:/repo" -w /repo ghcr.io/astral-sh/ruff:0.9.10 format scripts` |
+| Shell | `scripts/*.sh` and lab scripts (shellcheck) | `docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:stable scripts/*.sh` |
+| Dockerfile | Best practices (hadolint, settings in `.hadolint.yaml`) | `docker run --rm -v "$PWD:/repo" -w /repo hadolint/hadolint:v2.12.0 hadolint --config .hadolint.yaml Dockerfile` |
+| Workflows | GitHub Actions syntax (actionlint) | `docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7` |
+| JavaScript | `site/app.js` parses | `docker run --rm -v "$PWD:/repo" node:22-alpine node --check /repo/site/app.js` |
+| Terraform labs | `fmt`, `init` + `validate` on every lab, `terraform test` in lab 07 | `./scripts/validate-labs.sh` |
+| Content | Quizzes, exams and checkpoints parse, `site/content.js` is committed up to date, local Markdown links resolve | `python3 scripts/build-site.py && git diff --exit-code site/content.js` |
+
 The [Docker image workflow](.github/workflows/docker-publish.yml) builds the image on every pull request and
 publishes it on every push to `main` (`:latest` + short commit SHA) and on `vX.Y.Z` tags (`:X.Y.Z`, `:X.Y`).
 The [Pages workflow](.github/workflows/pages.yml) rebuilds `site/content.js` and deploys `site/` to GitHub Pages

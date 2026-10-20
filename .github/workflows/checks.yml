@@ -1,0 +1,100 @@
+# Lint, format, secret scanning and content checks for every push and pull request.
+# Every check can be run locally too; see the "Development" section of the README.
+name: Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secrets:
+    name: Secrets (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # scan the whole history, not only the last commit
+      - run: docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.24.3 git /repo --no-banner --redact -v
+
+  python:
+    name: Python (ruff lint + format)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff==0.9.10
+      - run: ruff check --output-format github scripts
+      - run: ruff format --check --diff scripts
+
+  shell-docker-actions:
+    name: Shell, Dockerfile and workflows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: shellcheck scripts/*.sh lessons/*/lab/*.sh
+      - name: hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+          config: .hadolint.yaml
+      - name: actionlint
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -color
+
+  javascript:
+    name: JavaScript (syntax)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node --check site/app.js
+
+  terraform:
+    name: Terraform labs (fmt, validate, test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.16.6"   # keep in sync with TERRAFORM_VERSION in the Dockerfile
+          terraform_wrapper: false
+      - name: fmt + init + validate every lab
+        run: ./scripts/validate-labs.sh
+      - name: terraform test (lab 07)
+        working-directory: lessons/07-maintain-infrastructure/lab
+        run: terraform test
+
+  content:
+    name: Course content (quizzes, checkpoints, links)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build site/content.js (validates quizzes, exams and lab checkpoints)
+        run: python3 scripts/build-site.py
+      - name: site/content.js is up to date
+        run: |
+          git diff --exit-code site/content.js || {
+            echo "::error file=site/content.js::Out of date. Run 'python3 scripts/build-site.py' and commit the result."
+            exit 1
+          }
+      - name: Local links in Markdown
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --offline --no-progress --include-fragments './**/*.md'
+          fail: true

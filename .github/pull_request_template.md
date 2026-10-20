@@ -8,3 +8,4 @@
 - [ ] No real exam questions.
 - [ ] `python3 scripts/build-site.py` runs without errors (it checks quiz answers and lab checkpoints).
 - [ ] If I changed a lab: `./scripts/validate-labs.sh` passes.
+- [ ] The **Checks** workflow is green.
