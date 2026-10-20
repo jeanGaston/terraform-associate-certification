@@ -7,8 +7,10 @@ ARG TARGETARCH
 
 # Tools the labs use in their shells (coreutils/grep/diff come with the base image).
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates curl unzip git tree jq less nano \
- && rm -rf /var/lib/apt/lists/*
+ && apt-get install -y --no-install-recommends ca-certificates curl unzip git tree jq less nano vim \
+ && rm -rf /var/lib/apt/lists/* \
+ && printf '%s\n' 'syntax on' 'filetype plugin indent on' 'set expandtab tabstop=2 shiftwidth=2 softtabstop=2' \
+      'set number ruler hlsearch incsearch backspace=indent,eol,start' > /etc/vim/vimrc.local
 
 # Terraform, verified against HashiCorp's published SHA256SUMS.
 RUN set -eux; \
@@ -32,6 +34,7 @@ RUN python3 scripts/build-site.py \
  && mkdir -p .lab-workspace /home/learner/.terraform.d/plugin-cache
 
 ENV PYTHONUNBUFFERED=1 \
+    EDITOR=vim \
     TF_PLUGIN_CACHE_DIR=/home/learner/.terraform.d/plugin-cache
 
 EXPOSE 8000
