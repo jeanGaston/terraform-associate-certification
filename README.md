@@ -5,6 +5,10 @@ Every lesson pairs a written lesson with a **hands-on lab that runs locally, wit
 (labs use the `local`, `random`, `null`, `time` and built-in `terraform_data` providers/resources).
 Everything is served by an interactive training website with in-browser lab terminals.
 
+**Just want to read and practise?** Open the online version: <https://jeangaston.github.io/terraform-associate-certification/>.
+It has every lesson, quiz, practice exam and flashcard, and saves your progress in your own browser.
+For the in-browser lab terminals, run the Docker image below.
+
 > [!WARNING]
 > **Not affiliated with HashiCorp or IBM.** This is an unofficial, personal project, vibecoded with AI
 > for learning only. It may contain mistakes: always cross-check with the
@@ -72,7 +76,8 @@ python3 scripts/build-site.py          # regenerate site/content.js after editin
 python3 -m http.server -d site 8000    # then open http://localhost:8000
 ```
 
-Opening `site/index.html` directly also works, and the `site/` folder can be hosted on GitHub Pages.
+Opening `site/index.html` directly also works. This static mode is what the
+[online version](https://jeangaston.github.io/terraform-associate-certification/) on GitHub Pages runs.
 
 ## How to study
 
@@ -157,7 +162,7 @@ Objectives, product version and pricing can change: check the
 ├── flashcards.md              ← rapid-recall Q&A
 ├── site/                      ← interactive training website
 ├── Dockerfile, compose.yaml   ← run the site + labs in a container
-├── .github/workflows/         ← CI: builds and publishes the Docker image to GHCR
+├── .github/workflows/         ← CI: Docker image to GHCR, website to GitHub Pages
 └── scripts/
     ├── validate-labs.sh       ← runs fmt/init/validate on every lab
     ├── build-site.py          ← bundles the Markdown into site/content.js
@@ -174,6 +179,8 @@ python3 scripts/build-site.py          # regenerate site/content.js after editin
 
 The [Docker image workflow](.github/workflows/docker-publish.yml) builds the image on every pull request and
 publishes it on every push to `main` (`:latest` + short commit SHA) and on `vX.Y.Z` tags (`:X.Y.Z`, `:X.Y`).
+The [Pages workflow](.github/workflows/pages.yml) rebuilds `site/content.js` and deploys `site/` to GitHub Pages
+on every push to `main`.
 
 ## Official resources
 
