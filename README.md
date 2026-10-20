@@ -118,6 +118,11 @@ and a file editor. Click ▶ next to any command in the instructions to run it. 
 sandbox copy under `.lab-workspace/<lesson>/` (gitignored), so the course files stay untouched.
 Use **Reset lab** to start a lab over.
 
+Labs contain **checkpoints**: `question` blocks (multiple choice about what you observed) and `check` blocks
+(the lab server runs the check's command in your sandbox to verify the step, for example that a resource is in
+state or a file was changed). A lab is complete when every checkpoint passes. Without the lab server, checks
+can be confirmed by hand. Lessons unlock in order: read the lesson, pass its quiz (80%+) and complete its lab.
+
 - Natively, it needs Linux, macOS or WSL, plus Terraform on your `PATH`. In Docker, sandboxes are in a volume instead of `.lab-workspace/`.
 - Listens on `127.0.0.1` only, and API calls need a per-run token, so other websites can't reach your shell.
 - The dashboard's **Reset all progress** button clears your saved progress and every lab sandbox.

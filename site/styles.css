@@ -369,3 +369,78 @@ pre.runnable { padding-left: 6px; }
   .wb-files { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
   .wb-filelist { flex-direction: row; flex-wrap: wrap; max-height: 96px; border-right: 0; border-bottom: 1px solid var(--border); }
 }
+
+/* ---------- lesson review quiz ---------- */
+.quiz { margin-top: 8px; }
+.quiz-q { margin: 14px 0; padding: 18px 20px; }
+.quiz-q .question { font-size: 16px; }
+.quiz-q .question .pill { margin-left: 6px; vertical-align: 2px; }
+.quiz-q .opts { margin: 12px 0 4px; gap: 8px; }
+.quiz-q .opt { padding: 9px 12px; }
+.quiz-q .explain { margin: 10px 0 0; }
+.quiz-score { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; margin: 14px 0; }
+.quiz-score .score-big { font-size: 44px; }
+.quiz-score.ok .score-big { color: var(--ok); }
+.quiz-score.warn .score-big { color: var(--warn); }
+.quiz-score.bad .score-big { color: var(--bad); }
+.quiz-actions { margin: 18px 0 8px; }
+.md .quiz p, .md .quiz li { max-width: none; }
+
+/* long inline code (paths, addresses) must wrap on narrow screens */
+.md :not(pre) > code, .opt code, .question code, .explain code { overflow-wrap: anywhere; }
+
+/* ---------- course progress bar (top) ---------- */
+.topbar { position: sticky; }
+.course-progress { position: absolute; left: 0; right: 0; bottom: -1px; height: 6px; display: flex; gap: 3px; padding: 0 3px; }
+.course-progress .seg { flex: 1; background: var(--border); border-radius: 0 0 3px 3px; overflow: hidden; display: block; }
+.course-progress .seg > span { display: block; height: 100%; background: var(--accent); transition: width .4s; }
+.course-progress .seg.done > span { background: var(--ok); }
+.course-progress .seg.locked { opacity: .55; }
+.course-progress .seg:hover { background: var(--muted); }
+.progress-label { font-size: 13px; color: var(--muted); text-decoration: none; white-space: nowrap; padding: 4px 10px; border-radius: 8px; background: var(--surface-2); }
+.progress-label b { color: var(--accent); }
+.progress-label:hover { color: var(--text); }
+
+/* ---------- locked lessons & step checklist ---------- */
+.nav-link.locked { color: var(--muted); }
+.nav-lock { margin-left: auto; color: var(--muted); display: inline-flex; }
+.lesson-card.locked { opacity: .6; }
+.lesson-card.locked:hover { transform: none; border-color: var(--border); }
+.lesson-card.done { border-color: color-mix(in srgb, var(--ok) 45%, var(--border)); }
+.lesson-card .num .lock { vertical-align: -1px; margin-left: 4px; }
+.complete-box { display: block; }
+.box-head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.step-list { list-style: none; padding: 0; margin: 0 0 14px; display: flex; flex-direction: column; gap: 8px; }
+.step-list li { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); flex-wrap: wrap; }
+.step-list li > div { flex: 1; min-width: 180px; display: flex; flex-direction: column; }
+.step-list li small { font-size: 13px; }
+.step-list li.done { background: var(--ok-soft); border-color: transparent; }
+.step-list .check { flex: none; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--border); display: grid; place-items: center; font-size: 13px; font-weight: 700; color: #fff; }
+.step-list li.done .check { background: var(--ok); border-color: var(--ok); }
+.locked-next { opacity: .55; cursor: not-allowed; gap: 6px; }
+.locked-card { text-align: center; padding: 40px 24px; }
+.locked-card .step-list { max-width: 420px; margin: 0 auto 22px; text-align: left; }
+.lock-badge { width: 56px; height: 56px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; margin: 0 auto 14px; }
+.lock-badge svg { width: 26px; height: 26px; }
+@media (max-width: 600px) { .progress-label .pl-long { display: none; } }
+
+/* ---------- lab checkpoints ---------- */
+.cp-progress { margin: 0 0 22px; }
+.checkpoint { margin: 16px 0; padding: 16px 18px; border-left: 4px solid var(--accent); }
+.checkpoint.passed { border-left-color: var(--ok); }
+.cp-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+.cp-head .pill { margin-left: auto; }
+.cp-tag { font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+.checkpoint.passed .cp-tag { color: var(--ok); }
+.checkpoint .question { font-size: 15.5px; }
+.checkpoint .opts { margin: 10px 0; gap: 8px; }
+.checkpoint .opt { padding: 8px 12px; }
+.checkpoint .explain { margin: 8px 0 0; }
+.cp-hint { margin: 0 0 10px; font-size: 14px; }
+.cp-wrong { color: var(--bad); font-size: 13.5px; font-weight: 500; }
+.cp-output { margin-top: 10px; font-size: 13px; }
+.cp-output summary { cursor: pointer; color: var(--muted); }
+.cp-output pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px; overflow-x: auto; white-space: pre-wrap; }
+
+/* Terraform syntax must read literally: no `>=` → ≥ or `~>` → arrow ligatures in code, editor or terminal */
+code, pre, kbd, textarea, .xterm, .xterm * { font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }

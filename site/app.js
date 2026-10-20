@@ -17,7 +17,7 @@
     load() { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } },
     save() { try { localStorage.setItem(KEY, JSON.stringify(P)); } catch { /* private mode */ } },
   };
-  const freshProgress = () => ({ lessons: {}, exams: {}, cards: {}, objectives: {}, run: null, last: null });
+  const freshProgress = () => ({ lessons: {}, exams: {}, cards: {}, objectives: {}, quizzes: {}, labChecks: {}, run: null, last: null });
   const P = Object.assign(freshProgress(), store.load());
   function resetProgress(epoch) {
     Object.keys(P).forEach((k) => delete P[k]);
@@ -115,16 +115,34 @@
   }
 
   /* ---------------- progress metrics ---------------- */
+  /* ---------------- lesson gating: read + quiz passed + lab done unlocks the next lesson ---------------- */
+  const PASS = 80;
+  const LOCK_ICON = `<svg class="lock" viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" fill="currentColor"/><path d="M8 11V8a4 4 0 018 0v3" fill="none" stroke="currentColor" stroke-width="2"/></svg>`;
+  const quizPassed = (l) => !l.quiz.length || (P.quizzes[l.id]?.best ?? 0) >= PASS;
+  // A lab with checkpoints is done when every checkpoint passed. `P.lessons[id].lab` is the old self-declared
+  // flag: it can no longer be set for labs with checkpoints, but labs completed that way stay completed.
+  const cpPassed = (l, id) => !!P.labChecks[l.id]?.[id];
+  const labProgress = (l) => ({ done: l.labCheckpoints.filter((c) => cpPassed(l, c.id)).length, total: l.labCheckpoints.length });
+  const labDone = (l) => { const p = labProgress(l); return !!P.lessons[l.id]?.lab || (p.total > 0 && p.done === p.total); };
+  const steps = (l) => ({ read: !!P.lessons[l.id]?.read, quiz: quizPassed(l), lab: labDone(l) });
+  const stepCount = (l) => Object.values(steps(l)).filter(Boolean).length;
+  const lessonDone = (l) => stepCount(l) === 3;
+  const isUnlocked = (i) => C.lessons.slice(0, i).every(lessonDone);
+
   function metrics() {
     const n = C.lessons.length;
     const read = C.lessons.filter((l) => P.lessons[l.id]?.read).length;
     const labs = C.lessons.filter((l) => P.lessons[l.id]?.lab).length;
+    const quizzes = C.lessons.filter((l) => quizPassed(l) && P.quizzes[l.id]).length;
+    const done = C.lessons.filter(lessonDone).length;
+    const stepsDone = C.lessons.reduce((a, l) => a + stepCount(l), 0);
+    const current = C.lessons.find((l) => !lessonDone(l));
     const best = C.exams.map((e) => Math.max(0, ...(P.exams[e.id] || []).map((h) => h.score)));
     const cardsSeen = C.flashcards.filter((c) => P.cards[c.n] !== undefined).length;
     const mastered = C.flashcards.filter((c) => (P.cards[c.n] || 0) >= 3).length;
     const objTotal = (C.objectives.match(/^- \[[ x]\]/gm) || []).length;
     const objDone = Object.values(P.objectives).filter(Boolean).length;
-    return { n, read, labs, best, cardsSeen, mastered, objTotal, objDone, course: pct(read + labs, n * 2) };
+    return { n, read, labs, quizzes, done, stepsDone, current, best, cardsSeen, mastered, objTotal, objDone, course: pct(stepsDone, n * 3) };
   }
 
   /* ---------------- sidebar ---------------- */
@@ -132,14 +150,17 @@
     const m = metrics();
     const link = (href, label, extra = "", num = "") =>
       `<a class="nav-link${route === href ? " active" : ""}" href="${href}">${num ? `<span class="nav-num">${num}</span>` : ""}<span>${label}</span>${extra}</a>`;
-    const dot = (id) => { const s = P.lessons[id] || {}; return `<span class="dot ${s.read && s.lab ? "done" : s.read || s.lab ? "half" : ""}" title="${s.read && s.lab ? "Done" : s.read || s.lab ? "In progress" : "Not started"}"></span>`; };
+    const dot = (l, i) => {
+      if (!isUnlocked(i)) return `<span class="nav-lock" title="Locked">${LOCK_ICON}</span>`;
+      const c = stepCount(l);
+      return `<span class="dot ${c === 3 ? "done" : c ? "half" : ""}" title="${c} of 3 steps done"></span>`;
+    };
     $("#sidebar").innerHTML = `
       <div class="nav-group">
         ${link("#/", "Dashboard")}
-        <div class="nav-progress"><div class="row muted" style="justify-content:space-between;font-size:12px"><span>Course progress</span><span>${m.course}%</span></div><div class="bar"><span style="width:${m.course}%"></span></div></div>
       </div>
       <div class="nav-group"><div class="nav-label">Lessons</div>
-        ${C.lessons.map((l) => link(`#/lesson/${l.id}`, esc(l.title), dot(l.id), l.num)).join("")}
+        ${C.lessons.map((l, i) => link(`#/lesson/${l.id}`, esc(l.title), dot(l, i), l.num).replace('class="nav-link', `class="nav-link${isUnlocked(i) ? "" : " locked"}`)).join("")}
       </div>
       <div class="nav-group"><div class="nav-label">Practice</div>
         ${C.exams.map((e) => link(`#/exam/${e.id}`, esc(e.title))).join("")}
@@ -151,16 +172,29 @@
         ${link("#/plan", "Study plan")}
         ${link("#/about", "About the exam")}
       </div>`;
+    updateTopProgress(m);
+  }
+
+  // Segmented bar under the top bar: one segment per lesson, filled by its completed steps.
+  function updateTopProgress(m = metrics()) {
+    const bar = $("#courseProgress");
+    bar.innerHTML = C.lessons.map((l, i) => {
+      const c = stepCount(l);
+      return `<a href="#/lesson/${l.id}" class="seg${c === 3 ? " done" : ""}${isUnlocked(i) ? "" : " locked"}" title="Lesson ${l.num}: ${esc(l.title)} — ${c}/3 steps"><span style="width:${(c / 3) * 100}%"></span></a>`;
+    }).join("");
+    bar.setAttribute("aria-valuenow", m.course);
+    $("#progressLabel").innerHTML = m.done === m.n
+      ? `<b>Course complete</b> · 100%`
+      : `<span class="pl-long">Lesson ${m.current.num}/${String(m.n).padStart(2, "0")} · </span><b>${m.course}%</b>`;
+    $("#progressLabel").href = m.done === m.n ? "#/" : `#/lesson/${m.current.id}`;
   }
 
   /* ---------------- pages ---------------- */
   function pageDashboard() {
     const m = metrics();
-    const next = C.lessons.find((l) => !(P.lessons[l.id]?.read && P.lessons[l.id]?.lab));
-    const lastLesson = P.last && C.lessons.find((l) => l.id === P.last);
-    const resume = lastLesson && !(P.lessons[lastLesson.id]?.read && P.lessons[lastLesson.id]?.lab) ? lastLesson : next;
+    const resume = m.current;
     const bestExam = Math.max(0, ...m.best);
-    const ready = bestExam >= 85 && m.read === m.n;
+    const ready = bestExam >= 85 && m.done === m.n;
     main.innerHTML = `<div class="page wide">
       <section class="hero">
         <div>
@@ -176,20 +210,20 @@
       </section>
 
       <div class="stats">
-        <div class="card stat"><div class="k">Lessons read</div><div class="v">${m.read}<span class="muted" style="font-size:16px"> / ${m.n}</span></div><div class="bar"><span style="width:${pct(m.read, m.n)}%"></span></div></div>
-        <div class="card stat"><div class="k">Labs completed</div><div class="v">${m.labs}<span class="muted" style="font-size:16px"> / ${m.n}</span></div><div class="bar"><span style="width:${pct(m.labs, m.n)}%"></span></div></div>
+        <div class="card stat"><div class="k">Lessons completed</div><div class="v">${m.done}<span class="muted" style="font-size:16px"> / ${m.n}</span></div><div class="bar"><span style="width:${pct(m.done, m.n)}%"></span></div></div>
+        <div class="card stat"><div class="k">Quizzes passed (${PASS}%+)</div><div class="v">${m.quizzes}<span class="muted" style="font-size:16px"> / ${m.n}</span></div><div class="bar"><span style="width:${pct(m.quizzes, m.n)}%"></span></div></div>
         <div class="card stat"><div class="k">Best practice exam</div><div class="v">${m.best.some((b) => b > 0) ? bestExam + "%" : "—"}</div><div class="bar ${bestExam >= 85 ? "ok" : ""}"><span style="width:${bestExam}%"></span></div></div>
         <div class="card stat"><div class="k">Flashcards mastered</div><div class="v">${m.mastered}<span class="muted" style="font-size:16px"> / ${C.flashcards.length}</span></div><div class="bar"><span style="width:${pct(m.mastered, C.flashcards.length)}%"></span></div></div>
       </div>
-      ${ready ? `<div class="card" style="border-color:var(--ok);margin-bottom:8px"><b style="color:var(--ok)">You look exam-ready.</b> All lessons read and a practice score ≥ 85%. Check the <a href="https://developer.hashicorp.com/certifications/infrastructure-automation" target="_blank" rel="noopener">official exam page</a> and book it.</div>` : ""}
+      ${ready ? `<div class="card" style="border-color:var(--ok);margin-bottom:8px"><b style="color:var(--ok)">You look exam-ready.</b> All lessons completed and a practice score ≥ 85%. Check the <a href="https://developer.hashicorp.com/certifications/infrastructure-automation" target="_blank" rel="noopener">official exam page</a> and book it.</div>` : ""}
 
-      <div class="section-h"><h2>Lessons</h2><span class="muted">${m.read + m.labs} of ${m.n * 2} steps done</span></div>
+      <div class="section-h"><h2>Lessons</h2><span class="muted">${m.stepsDone} of ${m.n * 3} steps done · read, quiz and lab unlock the next lesson</span></div>
       <div class="lesson-grid">
-        ${C.lessons.map((l) => { const s = P.lessons[l.id] || {}; return `
-          <a class="card lesson-card" href="#/lesson/${l.id}">
-            <span class="num">LESSON ${l.num}</span>
+        ${C.lessons.map((l, i) => { const open = isUnlocked(i); return `
+          <a class="card lesson-card${open ? "" : " locked"}${lessonDone(l) ? " done" : ""}" href="#/lesson/${l.id}">
+            <span class="num">LESSON ${l.num}${open ? "" : ` ${LOCK_ICON}`}</span>
             <h3>${esc(l.title)}</h3>
-            <div class="row"><span class="pill ${s.read ? "ok" : ""}">${s.read ? "✓ " : ""}Read</span><span class="pill ${s.lab ? "ok" : ""}">${s.lab ? "✓ " : ""}Lab</span></div>
+            <div class="row">${open ? stepPills(l) : `<span class="pill">Locked — finish lesson ${C.lessons[i - 1].num}</span>`}</div>
           </a>`; }).join("")}
       </div>
 
@@ -222,18 +256,55 @@
     };
   }
 
+  function stepPills(l) {
+    const st = steps(l), best = P.quizzes[l.id]?.best;
+    return `<span class="pill ${st.read ? "ok" : ""}">${st.read ? "✓ " : ""}Read</span>`
+      + `<span class="pill ${st.quiz ? "ok" : best !== undefined ? "bad" : ""}">${st.quiz ? "✓ " : ""}Quiz${best !== undefined ? ` ${best}%` : ""}</span>`
+      + `<span class="pill ${st.lab ? "ok" : ""}">${st.lab ? "✓ " : ""}Lab</span>`;
+  }
+
+  function pageLocked(i) {
+    const l = C.lessons[i];
+    const blocker = C.lessons.find((x) => !lessonDone(x));
+    const st = steps(blocker);
+    main.innerHTML = `<div class="page"><div class="card locked-card">
+      <div class="lock-badge">${LOCK_ICON}</div>
+      <p class="eyebrow">Lesson ${l.num} is locked</p>
+      <h1 class="page-title">${esc(l.title)}</h1>
+      <p class="lede">Finish <b>Lesson ${blocker.num} — ${esc(blocker.title)}</b> to unlock it. Still to do there:</p>
+      <ul class="step-list">${Object.entries({ read: "Read the lesson", quiz: `Pass the review quiz (${PASS}%+)`, lab: "Complete the hands-on lab" })
+        .map(([k, label]) => `<li class="${st[k] ? "done" : ""}"><span class="check">${st[k] ? "✓" : ""}</span>${label}</li>`).join("")}</ul>
+      <a class="btn primary" href="#/lesson/${blocker.id}">Go to Lesson ${blocker.num} →</a>
+    </div></div>`;
+  }
+
   function pageLesson(id, sub, rest, q) {
     const i = C.lessons.findIndex((l) => l.id === id);
     if (i < 0) return pageNotFound();
+    if (!isUnlocked(i)) return pageLocked(i);
     const l = C.lessons[i];
     const s = lessonState(id);
     P.last = id; store.save();
     const tab = sub || "lesson";
     const prev = C.lessons[i - 1], next = C.lessons[i + 1];
+    const headPills = () => stepPills(l);
+    const drawPager = () => {
+      const done = lessonDone(l);
+      $(".pager").innerHTML = `
+        ${prev ? `<a class="btn" href="#/lesson/${prev.id}">← ${prev.num}. ${esc(prev.title)}</a>` : "<span></span>"}
+        ${next ? (done ? `<a class="btn primary" href="#/lesson/${next.id}">${next.num}. ${esc(next.title)} →</a>`
+                      : `<span class="btn locked-next" aria-disabled="true" title="Complete this lesson's read, quiz and lab steps first">${LOCK_ICON} ${next.num}. ${esc(next.title)}</span>`)
+               : done ? `<a class="btn primary" href="#/exam/${C.exams[0].id}">Practice exam 1 →</a>` : "<span></span>"}`;
+    };
+    // redraw everything that depends on this lesson's progress
+    const refresh = (wasDone) => {
+      $(".lesson-head .row").innerHTML = headPills(); drawBox(); drawPager(); renderSidebar(`#/lesson/${id}`);
+      if (!wasDone && lessonDone(l)) toast(next ? `Lesson ${l.num} complete — Lesson ${next.num} unlocked 🎉` : "Course complete 🎉");
+    };
     main.innerHTML = `<div class="page${tab === "lab" ? " lab-page" : ""}">
       <div class="lesson-head">
         <div><p class="eyebrow">Lesson ${l.num} of ${String(C.lessons.length).padStart(2, "0")}</p></div>
-        <div class="row"><span class="pill ${s.read ? "ok" : ""}">${s.read ? "✓ Read" : "Not read"}</span><span class="pill ${s.lab ? "ok" : ""}">${s.lab ? "✓ Lab done" : "Lab pending"}</span></div>
+        <div class="row">${headPills()}</div>
       </div>
       <div class="tabs" role="tablist">
         <a class="tab ${tab === "lesson" ? "active" : ""}" href="#/lesson/${id}">Lesson</a>
@@ -242,10 +313,7 @@
       </div>
       <div id="lessonBody"></div>
       <div class="card complete-box" id="completeBox"></div>
-      <nav class="pager">
-        ${prev ? `<a class="btn" href="#/lesson/${prev.id}">← ${prev.num}. ${esc(prev.title)}</a>` : "<span></span>"}
-        ${next ? `<a class="btn" href="#/lesson/${next.id}">${next.num}. ${esc(next.title)} →</a>` : `<a class="btn primary" href="#/exam/${C.exams[0].id}">Practice exam 1 →</a>`}
-      </nav>
+      <nav class="pager"></nav>
     </div>`;
     const body = $("#lessonBody");
     if (tab === "files") {
@@ -264,9 +332,10 @@
         }
       }
     } else if (tab === "lab") {
-      labTab(l, body);
+      labTab(l, body, refresh);
     } else {
       const md = renderMd(l.md, l.dir);
+      if (l.quiz.length) md.append(renderQuiz(l, refresh));
       const heads = $$("h2", md);
       if (heads.length > 3) {
         const toc = document.createElement("details");
@@ -277,20 +346,94 @@
       body.append(md);
     }
     const box = $("#completeBox");
-    const drawBox = () => {
-      box.innerHTML = `<div><b>Track your progress</b><div class="muted" style="font-size:14px">${s.read && s.lab ? "Lesson complete — nice work." : "Mark each step once you've done it."}</div></div>
-        <div class="row">
-          <button class="btn ${s.read ? "ok" : "primary"}" data-k="read">${s.read ? "✓ Lesson read" : "Mark lesson as read"}</button>
-          <button class="btn ${s.lab ? "ok" : ""}" data-k="lab">${s.lab ? "✓ Lab completed" : "Mark lab as done"}</button>
-        </div>`;
-      $$("button", box).forEach((b) => (b.onclick = () => {
-        s[b.dataset.k] = !s[b.dataset.k]; store.save(); drawBox(); renderSidebar(location.hash.split("?")[0]);
-        $(".lesson-head .row").innerHTML = `<span class="pill ${s.read ? "ok" : ""}">${s.read ? "✓ Read" : "Not read"}</span><span class="pill ${s.lab ? "ok" : ""}">${s.lab ? "✓ Lab done" : "Lab pending"}</span>`;
-        if (s.read && s.lab) toast(`Lesson ${l.num} complete 🎉`);
+    function drawBox() {
+      const st = steps(l), best = P.quizzes[l.id]?.best, done = lessonDone(l);
+      const item = (k, title, detail, action) => `<li class="${st[k] ? "done" : ""}"><span class="check">${st[k] ? "✓" : ""}</span>
+        <div><b>${title}</b><small class="muted">${detail}</small></div>${st[k] ? "" : action}</li>`;
+      box.innerHTML = `
+        <div class="box-head"><b>${done ? `Lesson ${l.num} complete` : next ? `Complete these 3 steps to unlock Lesson ${next.num}` : "Complete these 3 steps to finish the course"}</b>
+          <span class="muted">${stepCount(l)} / 3</span></div>
+        <ol class="step-list">
+          ${item("read", "Read the lesson", "Work through every section above.", `<button class="btn small primary" data-k="read">Mark as read</button>`)}
+          ${item("quiz", `Pass the review quiz (${PASS}%+)`, best === undefined ? `${l.quiz.length} questions at the end of the lesson.` : st.quiz ? `Best score: ${best}%` : `Best score so far: ${best}% — you need ${PASS}%.`,
+            `<a class="btn small${st.read ? " primary" : ""}" href="#/lesson/${l.id}?s=review-quiz">${best === undefined ? "Take the quiz" : "Retry the quiz"}</a>`)}
+          ${l.labCheckpoints.length
+            ? item("lab", "Complete the hands-on lab", P.lessons[l.id]?.lab && labProgress(l).done < labProgress(l).total
+                ? "Completed before checkpoints existed. The checkpoints are still there to practise."
+                : `${labProgress(l).done} of ${labProgress(l).total} lab checkpoints passed.`,
+                tab === "lab" ? "" : `<a class="btn small${st.read && st.quiz ? " primary" : ""}" href="#/lesson/${l.id}/lab">Open the lab</a>`)
+            : item("lab", "Complete the hands-on lab", "Do every exercise, then confirm here.",
+                `${tab === "lab" ? "" : `<a class="btn small" href="#/lesson/${l.id}/lab">Open the lab</a>`}<button class="btn small${st.read && st.quiz ? " primary" : ""}" data-k="lab">Mark lab as done</button>`)}
+        </ol>
+        ${done && next ? `<a class="btn primary" href="#/lesson/${next.id}">Continue to Lesson ${next.num} →</a>` : ""}`;
+      $$("button[data-k]", box).forEach((b) => (b.onclick = () => {
+        const wasDone = lessonDone(l);
+        s[b.dataset.k] = true; store.save(); refresh(wasDone);
       }));
-    };
-    drawBox();
+    }
+    drawBox(); drawPager();
     scrollToSection(q.s);
+  }
+
+  /* ---------------- lesson review quizzes ---------------- */
+  function renderQuiz(l, onScore) {
+    const wrap = document.createElement("section");
+    wrap.className = "quiz";
+    let answers = {}, checked = false;
+    const isRight = (q) => { const a = answers[q.n] || []; return a.length === q.answer.length && q.answer.every((k) => a.includes(k)); };
+    const draw = () => {
+      const done = l.quiz.filter((q) => (answers[q.n] || []).length).length;
+      const correct = l.quiz.filter(isRight).length;
+      const score = pct(correct, l.quiz.length);
+      const r = P.quizzes[l.id];
+      wrap.innerHTML = `
+        <h2 id="review-quiz">Review quiz</h2>
+        <p class="muted">${l.quiz.length} questions. Answer them all, then check your score.${r ? ` Best so far: <b>${r.best}%</b>${r.attempts > 1 ? ` (${r.attempts} attempts)` : ""}.` : ""}</p>
+        ${checked ? `<div class="card quiz-score ${score >= 80 ? "ok" : score >= 60 ? "warn" : "bad"}"><div class="score-big">${score}%</div>
+          <div><b>${correct} of ${l.quiz.length} correct</b><br><span class="muted">${score === 100 ? "Perfect — on to the lab!" : score >= 80 ? "Solid. Review the explanations for the ones you missed." : "Re-read the sections behind the red answers, then try again."}</span></div></div>` : ""}
+        ${l.quiz.map((q) => {
+          const sel = answers[q.n] || [];
+          const need = q.multi ? ` <span class="pill accent">Select ${["", "ONE", "TWO", "THREE", "FOUR"][q.answer.length] || q.answer.length}</span>` : "";
+          return `<div class="quiz-q card" data-n="${q.n}">
+            <div class="question"><span class="muted">${q.n}.</span> ${inline(q.q.replace(/\s*\*\(Select [A-Z]+\)\*\s*$/, ""))}${need}</div>
+            <div class="opts" role="${q.multi ? "group" : "radiogroup"}">${q.options.map((o) => {
+              let cls = sel.includes(o.key) ? " sel" : "";
+              if (checked) cls = q.answer.includes(o.key) ? " correct" : sel.includes(o.key) ? " incorrect" : "";
+              return `<button class="opt${q.multi ? " multi" : ""}${cls}" data-k="${o.key}" ${checked ? "disabled" : ""} role="${q.multi ? "checkbox" : "radio"}" aria-checked="${sel.includes(o.key)}"><span class="key">${o.key}</span><span>${inline(o.text)}</span></button>`;
+            }).join("")}</div>
+            ${checked ? `<div class="explain ${isRight(q) ? "ok" : "bad"}"><b>${isRight(q) ? "Correct." : `Answer: ${q.answer.join(", ")}.`}</b> ${inline(q.explanation)}</div>` : ""}
+          </div>`;
+        }).join("")}
+        <div class="row quiz-actions">
+          ${checked ? `<button class="btn primary" data-act="retry">Try again</button>`
+            : `<button class="btn primary" data-act="check" ${done < l.quiz.length ? "disabled" : ""}>Check answers</button><span class="muted">${done} of ${l.quiz.length} answered</span>`}
+        </div>`;
+    };
+    wrap.addEventListener("click", (e) => {
+      const opt = e.target.closest(".opt");
+      if (opt && !checked) {
+        const q = l.quiz.find((x) => x.n === +opt.closest(".quiz-q").dataset.n), k = opt.dataset.k, a = answers[q.n] || [];
+        answers[q.n] = q.multi ? (a.includes(k) ? a.filter((x) => x !== k) : [...a, k].sort()) : [k];
+        const y = window.scrollY; draw(); window.scrollTo(0, y);
+        return;
+      }
+      const act = e.target.closest("[data-act]")?.dataset.act;
+      if (act === "check") {
+        checked = true;
+        const wasDone = lessonDone(l);
+        const score = pct(l.quiz.filter(isRight).length, l.quiz.length);
+        const r = P.quizzes[l.id] || { best: 0, attempts: 0 };
+        P.quizzes[l.id] = { best: Math.max(r.best, score), last: score, attempts: r.attempts + 1, date: Date.now() };
+        store.save(); draw(); onScore?.(wasDone);
+        $(".quiz-score", wrap)?.scrollIntoView({ behavior: "smooth", block: "center" });
+        if (score === 100) toast("Perfect score 🎉");
+      } else if (act === "retry") {
+        answers = {}; checked = false; draw();
+        $("#review-quiz").scrollIntoView({ behavior: "smooth" });
+      }
+    });
+    draw();
+    return wrap;
   }
 
   function pageDoc(md, base, q, opts = {}) {
@@ -636,9 +779,99 @@
     });
   }
 
-  async function labTab(l, body) {
+  /* ---------------- lab checkpoints: ```question and ```check blocks in LAB.md ---------------- */
+  function addCheckpoints(guide, l, server, onProgress) {
+    const cps = l.labCheckpoints;
+    if (!cps.length) return;
+    const blocks = $$("pre > code.language-question, pre > code.language-check", guide);
+    // the "> **Checkpoints:** ..." note is for GitHub readers; the progress card replaces it here
+    $$("blockquote", guide).forEach((q) => /^\s*Checkpoints:/.test(q.textContent) && q.remove());
+    const bar = document.createElement("div");
+    bar.className = "card cp-progress";
+    guide.querySelector("h1")?.after(bar);
+    const drawBar = () => {
+      const p = labProgress(l);
+      bar.innerHTML = `<div class="row" style="justify-content:space-between"><b>Lab checkpoints</b><span class="muted">${p.done} / ${p.total}${p.done === p.total ? " · lab complete ✓" : ""}</span></div>
+        <div class="bar ${p.done === p.total ? "ok" : ""}" style="margin-top:8px"><span style="width:${pct(p.done, p.total)}%"></span></div>
+        <p class="muted" style="font-size:13px;margin:8px 0 0">Answer each question and run each check as you go. ${server ? "Checks inspect your lab sandbox." : "Start <code>scripts/lab-server.py</code> to verify checks automatically, or confirm them by hand."}</p>`;
+    };
+    const pass = (cp) => {
+      const wasDone = lessonDone(l);
+      (P.labChecks[l.id] ||= {})[cp.id] = true; store.save(); drawBar();
+      if (labDone(l)) toast(`Lab ${l.num} complete ✓`);
+      onProgress?.(wasDone); // may announce the unlocked lesson, which should win over the lab toast
+    };
+    blocks.forEach((code, i) => {
+      const cp = cps[i];
+      if (!cp) return;
+      const el = document.createElement("div");
+      el.className = `checkpoint card ${cp.kind}`;
+      code.parentElement.replaceWith(el);
+      (cp.kind === "question" ? questionWidget : checkWidget)(el, cp);
+    });
+    drawBar();
+
+    function questionWidget(el, cp) {
+      let sel = cpPassed(l, cp.id) ? [...cp.answer] : [], wrong = false;
+      const draw = () => {
+        const done = cpPassed(l, cp.id);
+        el.classList.toggle("passed", done);
+        el.innerHTML = `<div class="cp-head"><span class="cp-tag">Question</span>${done ? `<span class="pill ok">✓ Passed</span>` : ""}</div>
+          <div class="question">${inline(cp.q)}${cp.multi ? ` <span class="pill accent">Select ${cp.answer.length}</span>` : ""}</div>
+          <div class="opts">${cp.options.map((o) => `<button class="opt${cp.multi ? " multi" : ""}${done ? (cp.answer.includes(o.key) ? " correct" : "") : sel.includes(o.key) ? " sel" : ""}" data-k="${o.key}" ${done ? "disabled" : ""}><span class="key">${o.key}</span><span>${inline(o.text)}</span></button>`).join("")}</div>
+          ${done ? `<div class="explain ok"><b>Correct.</b> ${inline(cp.explanation)}</div>`
+            : `<div class="row"><button class="btn small primary" data-act="check" ${sel.length ? "" : "disabled"}>Check answer</button>${wrong ? `<span class="cp-wrong">Not quite. Look at what your terminal showed and try again.</span>` : ""}</div>`}`;
+      };
+      el.addEventListener("click", (e) => {
+        const opt = e.target.closest(".opt");
+        if (opt && !cpPassed(l, cp.id)) {
+          const k = opt.dataset.k;
+          sel = cp.multi ? (sel.includes(k) ? sel.filter((x) => x !== k) : [...sel, k]) : [k];
+          wrong = false; draw(); return;
+        }
+        if (e.target.closest("[data-act=check]")) {
+          const right = sel.length === cp.answer.length && cp.answer.every((k) => sel.includes(k));
+          if (right) { pass(cp); draw(); } else { wrong = true; sel = []; draw(); }
+        }
+      });
+      draw();
+    }
+
+    function checkWidget(el, cp) {
+      let state = "idle", output = "";
+      const draw = () => {
+        const done = cpPassed(l, cp.id);
+        el.classList.toggle("passed", done);
+        el.innerHTML = `<div class="cp-head"><span class="cp-tag">Check</span><b>${esc(cp.title)}</b>${done ? `<span class="pill ok">✓ Verified</span>` : ""}</div>
+          ${done ? "" : `<p class="muted cp-hint">${inline(cp.hint)}</p>
+          <div class="row">
+            ${server ? `<button class="btn small primary" data-act="verify" ${state === "running" ? "disabled" : ""}>${state === "running" ? "Checking…" : "Check my work"}</button>` : ""}
+            ${!server || cp.manual ? `<button class="btn small" data-act="manual">${server ? "Confirm by hand" : "I did this"}</button>` : ""}
+            ${state === "fail" ? `<span class="cp-wrong">Not yet. Finish the step, then check again.</span>` : ""}
+          </div>
+          ${state === "fail" && output.trim() ? `<details class="cp-output"><summary>Check output</summary><pre>${esc(output)}</pre></details>` : ""}`}`;
+      };
+      el.addEventListener("click", async (e) => {
+        const act = e.target.closest("[data-act]")?.dataset.act;
+        if (act === "manual") { pass(cp); draw(); }
+        if (act === "verify") {
+          state = "running"; draw();
+          try {
+            const r = await api(`/api/labs/${l.id}/checks/${encodeURIComponent(cp.id)}`, { method: "POST" });
+            state = r.ok ? "idle" : "fail"; output = r.output || "";
+            if (r.ok) pass(cp);
+          } catch (err) { state = "fail"; output = err.message; }
+          draw();
+        }
+      });
+      draw();
+    }
+  }
+
+  async function labTab(l, body, onProgress) {
     const guide = renderMd(l.lab || "_This lesson has no lab._", `${l.dir}/lab`);
     const s = await labSession();
+    addCheckpoints(guide, l, !!s, onProgress);
     if (!s) {
       body.innerHTML = `<div class="card lab-hint"><b>Do this lab right here in the browser</b>
         <p class="muted">Start the local lab server from the repo root and open the address it prints. You get a real terminal and a file editor next to these instructions.</p>
@@ -829,7 +1062,8 @@
       flush(); return out;
     };
     index = [
-      ...C.lessons.flatMap((l) => [...chunks(l.md, `Lesson ${l.num}`, `#/lesson/${l.id}`), ...chunks(l.lab, `Lab ${l.num}`, `#/lesson/${l.id}/lab`),
+      ...C.lessons.flatMap((l) => l.quiz.map((q) => ({ where: `Lesson ${l.num} quiz · Q${q.n}`, title: q.q.replace(/[`*]/g, ""), route: `#/lesson/${l.id}?s=review-quiz`, text: q.options.map((o) => o.text).join(" ").replace(/`/g, "") }))),
+      ...C.lessons.flatMap((l) => [...chunks(l.md, `Lesson ${l.num}`, `#/lesson/${l.id}`), ...chunks(l.lab.replace(/^```(question|check)\n[\s\S]*?^```$/gm, ""), `Lab ${l.num}`, `#/lesson/${l.id}/lab`),
         ...l.labFiles.map((f) => ({ where: `Lab ${l.num} file`, title: f.path, route: `#/lesson/${l.id}/files/${f.path}`, text: f.content }))]),
       ...C.cheatsheets.flatMap((c) => chunks(c.md, "Cheatsheet", `#/cheatsheet/${c.id}`)),
       ...chunks(C.studyPlan, "Study plan", "#/plan"),

@@ -18,6 +18,7 @@ import json
 import mimetypes
 import os
 import pty
+import re
 import secrets
 import shutil
 import signal
@@ -63,6 +64,36 @@ def safe_path(ws, rel):
     if p != ws.resolve() and ws.resolve() not in p.parents:
         raise PermissionError(rel)
     return p
+
+
+# ---------------------------------------------------------------- lab checks
+CHECK_RE = re.compile(r"^```check\n(.*?)^```$", re.M | re.S)
+CHECK_TIMEOUT = 120
+
+
+def lab_check(lab, check_id):
+    """The `run` command of a ```check block, read from the ORIGINAL lab guide (never from the
+    sandbox copy or the request), so only commands that ship with the course can be executed."""
+    workspace(lab, create=False)  # validates the lab id
+    guide = (ROOT / "lessons" / lab / "lab" / "LAB.md").read_text(encoding="utf-8")
+    for body in CHECK_RE.findall(guide):
+        fields = dict(line.split(":", 1) for line in body.splitlines() if ":" in line)
+        fields = {k.strip().lower(): v.strip() for k, v in fields.items()}
+        if fields.get("id") == check_id and fields.get("run"):
+            return fields["run"]
+    raise KeyError(check_id)
+
+
+def run_check(lab, check_id):
+    cmd = lab_check(lab, check_id)
+    env = dict(os.environ, TF_IN_AUTOMATION="1", TF_INPUT="0", NO_COLOR="1")
+    try:
+        r = subprocess.run(["bash", "-c", cmd], cwd=workspace(lab), env=env, capture_output=True,
+                           text=True, timeout=CHECK_TIMEOUT, stdin=subprocess.DEVNULL)
+        output = re.sub(r"\x1b\[[0-9;]*m", "", r.stdout + r.stderr)  # Terraform ignores NO_COLOR
+        return {"ok": r.returncode == 0, "output": output[-2000:]}
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "output": f"check timed out after {CHECK_TIMEOUT}s"}
 
 
 # ---------------------------------------------------------------- terminals
@@ -238,6 +269,8 @@ class Handler(BaseHTTPRequestHandler):
                 if method == "DELETE":
                     path.unlink()
                     return self._json({"ok": True})
+            if action == "checks" and len(parts) == 4 and method == "POST":
+                return self._json(run_check(lab, parts[3]))
             if action == "reset" and method == "POST":
                 for t in terms_for(lab):
                     t.kill()
@@ -347,6 +380,9 @@ def main():
     if not args.no_build:
         subprocess.run([sys.executable, str(ROOT / "scripts" / "build-site.py")], check=True)
     WORKSPACE.mkdir(exist_ok=True)
+    # Terraform warns on every command if the configured provider cache directory is missing.
+    if cache := os.environ.get("TF_PLUGIN_CACHE_DIR"):
+        Path(cache).mkdir(parents=True, exist_ok=True)
     if args.reset:
         reset_all()
         print("  All lab sandboxes deleted; saved progress will be cleared in your browser on next visit.")
