@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Official exam information
+    url: https://developer.hashicorp.com/certifications/infrastructure-automation
+    about: Exam format, objectives, pricing and booking. This project is unofficial and can't answer those.
+  - name: Terraform documentation
+    url: https://developer.hashicorp.com/terraform/docs
+    about: Questions about Terraform itself rather than this course.

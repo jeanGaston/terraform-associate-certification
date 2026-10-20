@@ -1,0 +1,52 @@
+name: Bug
+description: The website, the lab server or the Docker image doesn't work as expected.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: setup
+    attributes:
+      label: How do you run the course?
+      options:
+        - Online version (GitHub Pages)
+        - Docker image (ghcr.io)
+        - Docker, built locally
+        - Natively (python3 scripts/lab-server.py)
+        - Static site (local http.server or index.html)
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, browser, and for Docker the image tag or commit.
+      placeholder: "Windows 11 + WSL2, Firefox 131, image :latest"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open lesson 04, Hands-on lab tab
+        2. Click ▶ on `terraform apply`
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: Include error messages and, if you can, the browser console or server logs (`docker compose logs`).
+    validations:
+      required: true

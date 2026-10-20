@@ -149,6 +149,7 @@ Objectives, product version and pricing can change: check the
 .
 ├── README.md                  ← you are here
 ├── LICENSE, LICENSE-CONTENT   ← MIT (code) and CC BY 4.0 (course content)
+├── CONTRIBUTING.md            ← how to report errors and send fixes
 ├── STUDY-PLAN.md              ← 4-week schedule (and a 1-week crash plan)
 ├── EXAM-OBJECTIVES.md         ← every objective mapped to a lesson
 ├── lessons/
@@ -162,7 +163,7 @@ Objectives, product version and pricing can change: check the
 ├── flashcards.md              ← rapid-recall Q&A
 ├── site/                      ← interactive training website
 ├── Dockerfile, compose.yaml   ← run the site + labs in a container
-├── .github/workflows/         ← CI: Docker image to GHCR, website to GitHub Pages
+├── .github/                   ← CI (Docker image, Pages), issue and PR templates
 └── scripts/
     ├── validate-labs.sh       ← runs fmt/init/validate on every lab
     ├── build-site.py          ← bundles the Markdown into site/content.js
@@ -181,6 +182,11 @@ The [Docker image workflow](.github/workflows/docker-publish.yml) builds the ima
 publishes it on every push to `main` (`:latest` + short commit SHA) and on `vX.Y.Z` tags (`:X.Y.Z`, `:X.Y`).
 The [Pages workflow](.github/workflows/pages.yml) rebuilds `site/content.js` and deploys `site/` to GitHub Pages
 on every push to `main`.
+
+## Contributing
+
+Found a wrong answer, an outdated fact or a bug? [Open an issue](https://github.com/jeanGaston/terraform-associate-certification/issues/new/choose)
+or send a pull request. [CONTRIBUTING.md](CONTRIBUTING.md) explains the ground rules and the content formats.
 
 ## Official resources
 

@@ -1,0 +1,74 @@
+name: Content error
+description: A wrong answer, an outdated fact, a broken lab step or an unclear explanation.
+title: "[Content] "
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping keep the course accurate! Please **never paste real exam questions**:
+        they're covered by HashiCorp's exam agreement, and this course only uses original questions.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where is it?
+      options:
+        - Lesson text
+        - Lesson review quiz
+        - Lab guide or lab checkpoint
+        - Lab Terraform code
+        - Practice exam
+        - Flashcards
+        - Cheatsheet
+        - Exam objectives / study plan
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: location
+    attributes:
+      label: Exact location
+      description: File, section or question number, or the website URL.
+      placeholder: "lessons/03-core-workflow/README.md, quiz question 6"
+    validations:
+      required: true
+
+  - type: textarea
+    id: wrong
+    attributes:
+      label: What's wrong?
+      description: Quote the current text or answer.
+    validations:
+      required: true
+
+  - type: textarea
+    id: correct
+    attributes:
+      label: What should it say?
+    validations:
+      required: true
+
+  - type: input
+    id: source
+    attributes:
+      label: Source
+      description: A link to the official Terraform or HashiCorp documentation that backs the correction.
+      placeholder: "https://developer.hashicorp.com/terraform/..."
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Terraform version (if relevant)
+      placeholder: "1.12.2"
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmation
+      options:
+        - label: This report doesn't contain real exam questions.
+          required: true
