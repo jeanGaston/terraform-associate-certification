@@ -17,14 +17,7 @@ Everything is served by an interactive training website with in-browser lab term
 Nothing to install except Docker. CI publishes a ready-to-run image (amd64 + arm64) with Terraform and every
 lab tool preinstalled to `ghcr.io/jeangaston/terraform-associate-certification`, rebuilt on every push to `main`.
 
-**1. Log in to GHCR** (once; needed while the repository is private). Create a
-[personal access token (classic)](https://github.com/settings/tokens) with the `read:packages` scope, then:
-
-```bash
-echo "<your-token>" | docker login ghcr.io -u <your-github-username> --password-stdin
-```
-
-**2. Start the server**, from a clone of this repo:
+**1. Start the server**, from a clone of this repo:
 
 ```bash
 docker compose pull                    # get the latest image
@@ -41,7 +34,7 @@ docker run -d --name terraform-associate --init \
   ghcr.io/jeangaston/terraform-associate-certification:latest
 ```
 
-**3. Day to day:**
+**2. Day to day:**
 
 | Task | Compose | `docker run` |
 |---|---|---|
@@ -150,6 +143,7 @@ Objectives, product version and pricing can change: check the
 ```
 .
 ├── README.md                  ← you are here
+├── LICENSE, LICENSE-CONTENT   ← MIT (code) and CC BY 4.0 (course content)
 ├── STUDY-PLAN.md              ← 4-week schedule (and a 1-week crash plan)
 ├── EXAM-OBJECTIVES.md         ← every objective mapped to a lesson
 ├── lessons/
@@ -191,11 +185,18 @@ publishes it on every push to `main` (`:latest` + short commit SHA) and on `vX.Y
 
 ## Disclaimer
 
-- **Not affiliated with, endorsed by or sponsored by HashiCorp or IBM.** Terraform, HCP Terraform and the
-  Terraform logo are trademarks of HashiCorp, Inc., used here only to identify the subject of the course.
+- **Not affiliated with, endorsed by or sponsored by HashiCorp or IBM.** Terraform and HCP Terraform are
+  trademarks of HashiCorp, Inc., used here only to identify the subject of the course.
 - **Vibecoded, for learning only.** The course content, labs, website and tooling were largely generated with
   AI assistance as a personal learning project. They may contain errors or be out of date, and nothing here is
   production guidance.
 - **Not real exam questions.** Practice questions are original and written to exercise the objectives.
   Passing them does not guarantee passing the real exam.
 - Provided as is, with no warranty. Always cross-check with the official HashiCorp documentation.
+
+## License
+
+- **Code** (`scripts/`, `site/`, the Dockerfile, CI and the lab `.tf` files): [MIT](LICENSE).
+- **Course content** (lessons, lab guides, quizzes, practice exams, flashcards, cheatsheets and other Markdown):
+  [CC BY 4.0](LICENSE-CONTENT). You may share and adapt it, including commercially, as long as you give credit
+  and link back to this repository.

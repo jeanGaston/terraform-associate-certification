@@ -181,7 +181,7 @@
         ${link("#/plan", "Study plan")}
         ${link("#/about", "About the exam")}
       </div>
-      <p class="trademark">Unofficial study site. Terraform and the Terraform logo are trademarks of HashiCorp, used here only to identify the product.</p>`;
+      <p class="trademark">Unofficial study site, not affiliated with HashiCorp. Terraform is a trademark of HashiCorp, used here only to identify the product.</p>`;
     updateTopProgress(m);
   }
 
