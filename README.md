@@ -81,7 +81,8 @@ Every lesson pairs a written lesson with a **hands-on lab that runs locally, wit
 ## Training website
 
 The whole course is also available as an interactive website in [`site/`](site/): lessons and labs,
-timed practice exams (or study mode with instant explanations), flashcards with mastery tracking,
+timed practice exams (or study mode with instant explanations; questions and options are shuffled on every
+attempt, and a "Random mix" exam draws 40 questions from both), flashcards with mastery tracking,
 a clickable objectives checklist, full-text search, and a progress dashboard. Progress is saved in your browser.
 
 ### Do the labs in your browser

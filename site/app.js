@@ -138,11 +138,12 @@
     const stepsDone = C.lessons.reduce((a, l) => a + stepCount(l), 0);
     const current = C.lessons.find((l) => !lessonDone(l));
     const best = C.exams.map((e) => Math.max(0, ...(P.exams[e.id] || []).map((h) => h.score)));
+    const bestRandom = Math.max(0, ...(P.exams.random || []).map((h) => h.score));
     const cardsSeen = C.flashcards.filter((c) => P.cards[c.n] !== undefined).length;
     const mastered = C.flashcards.filter((c) => (P.cards[c.n] || 0) >= 3).length;
     const objTotal = (C.objectives.match(/^- \[[ x]\]/gm) || []).length;
     const objDone = Object.values(P.objectives).filter(Boolean).length;
-    return { n, read, labs, quizzes, done, stepsDone, current, best, cardsSeen, mastered, objTotal, objDone, course: pct(stepsDone, n * 3) };
+    return { n, read, labs, quizzes, done, stepsDone, current, best, bestRandom, cardsSeen, mastered, objTotal, objDone, course: pct(stepsDone, n * 3) };
   }
 
   /* ---------------- sidebar ---------------- */
@@ -164,6 +165,7 @@
       </div>
       <div class="nav-group"><div class="nav-label">Practice</div>
         ${C.exams.map((e) => link(`#/exam/${e.id}`, esc(e.title))).join("")}
+        ${link("#/exam/random", "Random mix")}
         ${link("#/flashcards", "Flashcards")}
       </div>
       <div class="nav-group"><div class="nav-label">Reference</div>
@@ -171,7 +173,8 @@
         ${link("#/objectives", "Exam objectives")}
         ${link("#/plan", "Study plan")}
         ${link("#/about", "About the exam")}
-      </div>`;
+      </div>
+      <p class="trademark">Unofficial study site. Terraform and the Terraform logo are trademarks of HashiCorp, used here only to identify the product.</p>`;
     updateTopProgress(m);
   }
 
@@ -193,7 +196,7 @@
   function pageDashboard() {
     const m = metrics();
     const resume = m.current;
-    const bestExam = Math.max(0, ...m.best);
+    const bestExam = Math.max(0, ...m.best, m.bestRandom);
     const ready = bestExam >= 85 && m.done === m.n;
     main.innerHTML = `<div class="page wide">
       <section class="hero">
@@ -212,7 +215,7 @@
       <div class="stats">
         <div class="card stat"><div class="k">Lessons completed</div><div class="v">${m.done}<span class="muted" style="font-size:16px"> / ${m.n}</span></div><div class="bar"><span style="width:${pct(m.done, m.n)}%"></span></div></div>
         <div class="card stat"><div class="k">Quizzes passed (${PASS}%+)</div><div class="v">${m.quizzes}<span class="muted" style="font-size:16px"> / ${m.n}</span></div><div class="bar"><span style="width:${pct(m.quizzes, m.n)}%"></span></div></div>
-        <div class="card stat"><div class="k">Best practice exam</div><div class="v">${m.best.some((b) => b > 0) ? bestExam + "%" : "—"}</div><div class="bar ${bestExam >= 85 ? "ok" : ""}"><span style="width:${bestExam}%"></span></div></div>
+        <div class="card stat"><div class="k">Best practice exam</div><div class="v">${bestExam > 0 ? bestExam + "%" : "—"}</div><div class="bar ${bestExam >= 85 ? "ok" : ""}"><span style="width:${bestExam}%"></span></div></div>
         <div class="card stat"><div class="k">Flashcards mastered</div><div class="v">${m.mastered}<span class="muted" style="font-size:16px"> / ${C.flashcards.length}</span></div><div class="bar"><span style="width:${pct(m.mastered, C.flashcards.length)}%"></span></div></div>
       </div>
       ${ready ? `<div class="card" style="border-color:var(--ok);margin-bottom:8px"><b style="color:var(--ok)">You look exam-ready.</b> All lessons completed and a practice score ≥ 85%. Check the <a href="https://developer.hashicorp.com/certifications/infrastructure-automation" target="_blank" rel="noopener">official exam page</a> and book it.</div>` : ""}
@@ -235,6 +238,11 @@
             <span class="muted" style="font-size:14px">${e.questions.length} questions${h.length ? ` · ${h.length} attempt${h.length > 1 ? "s" : ""}` : ""}</span>
             <div class="row">${h.length ? `<span class="pill ${m.best[i] >= 85 ? "ok" : m.best[i] >= 70 ? "warn" : "bad"}">Best ${m.best[i]}%</span>` : `<span class="pill">Not taken</span>`}</div>
           </a>`; }).join("")}
+        <a class="card lesson-card" href="#/exam/random">
+          <span class="num">SHUFFLE</span><h3>Random mix</h3>
+          <span class="muted" style="font-size:14px">${C.exams[0].questions.length} questions drawn from both exams${(P.exams.random || []).length ? ` · ${P.exams.random.length} attempt${P.exams.random.length > 1 ? "s" : ""}` : ""}</span>
+          <div class="row">${(P.exams.random || []).length ? `<span class="pill ${m.bestRandom >= 85 ? "ok" : m.bestRandom >= 70 ? "warn" : "bad"}">Best ${m.bestRandom}%</span>` : `<span class="pill">Not taken</span>`}</div>
+        </a>
         <a class="card lesson-card" href="#/flashcards">
           <span class="num">RECALL</span><h3>Flashcards</h3>
           <span class="muted" style="font-size:14px">${m.cardsSeen} of ${C.flashcards.length} seen</span>
@@ -501,24 +509,57 @@
   }
 
   /* ---------------- practice exams ---------------- */
+  // Questions are addressed as "<exam id>:<n>" so an attempt can mix exams. Every attempt shuffles the question
+  // order and each question's options (letters are reassigned; True/False keeps its order) and stores that
+  // order, so resuming and reviewing show exactly what was on screen.
   let timerId = null;
+  const shuffle = (a) => a.map((x) => [Math.random(), x]).sort((p, q) => p[0] - q[0]).map((x) => x[1]);
+  const QREF = Object.fromEntries(C.exams.flatMap((e) => e.questions.map((q) => [`${e.id}:${q.n}`, { ...q, ref: `${e.id}:${q.n}`, source: e.title }])));
+  const RANDOM_EXAM = { id: "random", title: "Random mix", intro: C.exams[0].intro, questions: Object.values(QREF), size: C.exams[0].questions.length };
+  const examById = (id) => (id === RANDOM_EXAM.id ? RANDOM_EXAM : C.exams.find((x) => x.id === id));
+  const optionOrder = (q) => (q.options.map((o) => o.text).join() === "True,False" ? q.options.map((o) => o.key) : shuffle(q.options.map((o) => o.key)));
+  const LETTERS = "ABCDEFGH";
+  // display letter <-> original option key, for one question in one attempt
+  const optView = (q, order) => (order || q.options.map((o) => o.key)).map((key, i) => ({ ...q.options.find((o) => o.key === key), key, letter: LETTERS[i] }));
+  const toLetters = (q, order, keys) => optView(q, order).filter((o) => keys.includes(o.key)).map((o) => o.letter);
+  // attempts saved before refs/shuffling existed used question numbers and the original option order
+  function normalizeAttempt(e, a) {
+    if (!a) return a;
+    if (typeof a.qs?.[0] === "number") {
+      const r = (n) => `${e.id}:${n}`;
+      a.qs = a.qs.map(r);
+      a.wrong = (a.wrong || []).map(r);
+      for (const k of ["answers", "checked", "flags"]) if (a[k]) a[k] = Object.fromEntries(Object.entries(a[k]).map(([n, v]) => [r(n), v]));
+    }
+    a.order ||= {};
+    return a;
+  }
+  function newRun(e, mode, label, refs, mins) {
+    const qs = shuffle(refs);
+    P.run = { exam: e.id, mode, label, qs, order: Object.fromEntries(qs.map((r) => [r, optionOrder(QREF[r])])), idx: 0,
+      answers: {}, checked: {}, flags: {}, start: Date.now(), deadline: mode === "exam" ? Date.now() + mins * 60000 : null };
+    store.save();
+  }
   function examMeta(e) {
     const mins = +(e.intro.match(/(\d+)\s*minutes/) || [])[1] || 60;
     const pass = +(e.intro.match(/pass mark:\s*(\d+)%/) || [])[1] || 70;
     return { mins, pass };
   }
   function pageExam(id, sub) {
-    const e = C.exams.find((x) => x.id === id);
+    const e = examById(id);
     if (!e) return pageNotFound();
-    if (sub === "results") return examResults(e);
-    if (P.run && P.run.exam === id) return examRun(e);
+    const hist = (P.exams[id] || []).map((h) => normalizeAttempt(e, h));
+    if (sub === "results") return examResults(e, hist);
+    if (P.run && P.run.exam === id) { normalizeAttempt(e, P.run); return examRun(e); }
     const { mins, pass } = examMeta(e);
-    const hist = P.exams[id] || [];
+    const size = e.size || e.questions.length;
     const lastWrong = hist.length ? hist[hist.length - 1].wrong : [];
+    const isRandom = e === RANDOM_EXAM;
     main.innerHTML = `<div class="page">
       <p class="eyebrow">Practice exam</p>
       <h1 class="page-title">${esc(e.title)}</h1>
-      <p class="lede">${e.questions.length} questions · ${mins} minutes · pass mark ${pass}% (aim for 85%+ before booking the real exam).</p>
+      <p class="lede">${isRandom ? `${size} questions drawn at random from all ${e.questions.length} practice-exam questions` : `${size} questions`} · ${mins} minutes · pass mark ${pass}% (aim for 85%+ before booking the real exam).
+        Questions and answer options are shuffled on every attempt.</p>
       <div class="mode-cards">
         <div class="card"><h3>Exam mode</h3><p class="muted">Timed, no feedback until you submit — just like test day.</p><button class="btn primary" data-mode="exam">Start timed exam</button></div>
         <div class="card"><h3>Study mode</h3><p class="muted">Untimed. Check each answer and read the explanation as you go.</p><button class="btn" data-mode="study">Start study mode</button></div>
@@ -531,15 +572,14 @@
     </div>`;
     $$("[data-mode]", main).forEach((b) => (b.onclick = () => {
       const mode = b.dataset.mode;
-      const qs = mode === "retry" ? lastWrong : e.questions.map((x) => x.n);
-      P.run = { exam: id, mode: mode === "retry" ? "study" : mode, label: mode, qs, idx: 0, answers: {}, checked: {}, flags: {}, start: Date.now(), deadline: mode === "exam" ? Date.now() + mins * 60000 : null };
-      store.save(); examRun(e);
+      const refs = mode === "retry" ? lastWrong : isRandom ? shuffle(Object.keys(QREF)).slice(0, size) : e.questions.map((x) => `${e.id}:${x.n}`);
+      newRun(e, mode === "retry" ? "study" : mode, mode, refs, mins);
+      examRun(e);
     }));
   }
 
   function examRun(e) {
     const R = P.run;
-    const byN = Object.fromEntries(e.questions.map((x) => [x.n, x]));
     const study = R.mode === "study";
     main.innerHTML = `<div class="page">
       <div class="exam-top">
@@ -562,32 +602,32 @@
     };
     clearInterval(timerId); timerId = setInterval(tick, 1000); tick();
 
-    const isRight = (q) => { const a = R.answers[q.n] || []; return a.length === q.answer.length && q.answer.every((k) => a.includes(k)); };
+    const isRight = (q) => { const a = R.answers[q.ref] || []; return a.length === q.answer.length && q.answer.every((k) => a.includes(k)); };
     function nav() {
-      $("#qnav").innerHTML = R.qs.map((n, i) => {
-        const q = byN[n]; let cls = (R.answers[n] || []).length ? "answered" : "";
-        if (study && R.checked[n]) cls = isRight(q) ? "right" : "wrong";
-        return `<button class="${cls}${i === R.idx ? " current" : ""}${R.flags[n] ? " flag" : ""}" data-i="${i}" aria-label="Question ${q.n}">${q.n}</button>`;
+      $("#qnav").innerHTML = R.qs.map((ref, i) => {
+        const q = QREF[ref]; let cls = (R.answers[ref] || []).length ? "answered" : "";
+        if (study && R.checked[ref]) cls = isRight(q) ? "right" : "wrong";
+        return `<button class="${cls}${i === R.idx ? " current" : ""}${R.flags[ref] ? " flag" : ""}" data-i="${i}" aria-label="Question ${i + 1}">${i + 1}</button>`;
       }).join("");
       $$("#qnav button").forEach((b) => (b.onclick = () => go(+b.dataset.i)));
     }
     function draw() {
-      const q = byN[R.qs[R.idx]];
-      const sel = R.answers[q.n] || [];
-      const revealed = study && R.checked[q.n];
+      const q = QREF[R.qs[R.idx]], order = R.order[q.ref];
+      const sel = R.answers[q.ref] || [];
+      const revealed = study && R.checked[q.ref];
       const need = q.multi ? `Select ${["", "ONE", "TWO", "THREE", "FOUR"][q.answer.length] || q.answer.length}` : "";
       $("#qcard").innerHTML = `
-        <div class="row" style="justify-content:space-between;margin-bottom:10px"><span class="muted" style="font-size:13px">Question ${R.idx + 1} of ${R.qs.length}${need ? ` · <b>${need}</b>` : ""}</span>
-          <button class="btn small" id="flagBtn">${R.flags[q.n] ? "★ Flagged" : "☆ Flag for review"}</button></div>
+        <div class="row" style="justify-content:space-between;margin-bottom:10px"><span class="muted" style="font-size:13px">Question ${R.idx + 1} of ${R.qs.length}${need ? ` · <b>${need}</b>` : ""}${e === RANDOM_EXAM ? ` · from ${esc(q.source)}` : ""}</span>
+          <button class="btn small" id="flagBtn">${R.flags[q.ref] ? "★ Flagged" : "☆ Flag for review"}</button></div>
         <div class="question">${marked.parse(q.q.replace(/\s*\*\(Select [A-Z]+\)\*\s*$/, ""))}</div>
         <div class="opts" role="${q.multi ? "group" : "radiogroup"}">
-          ${q.options.map((o) => {
+          ${optView(q, order).map((o) => {
             let cls = sel.includes(o.key) ? " sel" : "";
             if (revealed) cls = q.answer.includes(o.key) ? " correct" : sel.includes(o.key) ? " incorrect" : "";
-            return `<button class="opt${q.multi ? " multi" : ""}${cls}" data-k="${o.key}" ${revealed ? "disabled" : ""} role="${q.multi ? "checkbox" : "radio"}" aria-checked="${sel.includes(o.key)}"><span class="key">${o.key}</span><span>${inline(o.text)}</span></button>`;
+            return `<button class="opt${q.multi ? " multi" : ""}${cls}" data-k="${o.letter}" ${revealed ? "disabled" : ""} role="${q.multi ? "checkbox" : "radio"}" aria-checked="${sel.includes(o.key)}"><span class="key">${o.letter}</span><span>${inline(o.text)}</span></button>`;
           }).join("")}
         </div>
-        ${revealed ? `<div class="explain ${isRight(q) ? "ok" : "bad"}"><b>${isRight(q) ? "Correct." : `Answer: ${q.answer.join(", ")}.`}</b> ${inline(q.explanation)}</div>` : ""}
+        ${revealed ? `<div class="explain ${isRight(q) ? "ok" : "bad"}"><b>${isRight(q) ? "Correct." : `Answer: ${toLetters(q, order, q.answer).join(", ")}.`}</b> ${inline(q.explanation)}</div>` : ""}
         <div class="row" style="justify-content:space-between">
           <button class="btn" id="prevBtn" ${R.idx === 0 ? "disabled" : ""}>← Previous</button>
           <div class="row">
@@ -596,32 +636,33 @@
           </div>
         </div>`;
       $$(".opt", $("#qcard")).forEach((b) => (b.onclick = () => choose(b.dataset.k)));
-      $("#flagBtn").onclick = () => { R.flags[q.n] = !R.flags[q.n]; store.save(); draw(); nav(); };
+      $("#flagBtn").onclick = () => { R.flags[q.ref] = !R.flags[q.ref]; store.save(); draw(); nav(); };
       $("#prevBtn").onclick = () => go(R.idx - 1);
       $("#nextBtn") && ($("#nextBtn").onclick = () => go(R.idx + 1));
       $("#endBtn") && ($("#endBtn").onclick = () => confirmFinish());
       $("#checkBtn") && ($("#checkBtn").onclick = check);
     }
-    function choose(k) {
-      const q = byN[R.qs[R.idx]];
-      if (study && R.checked[q.n]) return;
-      const a = R.answers[q.n] || [];
-      R.answers[q.n] = q.multi ? (a.includes(k) ? a.filter((x) => x !== k) : [...a, k].sort()) : [k];
+    function choose(letter) {
+      const q = QREF[R.qs[R.idx]];
+      const k = optView(q, R.order[q.ref]).find((o) => o.letter === letter)?.key;
+      if (!k || (study && R.checked[q.ref])) return;
+      const a = R.answers[q.ref] || [];
+      R.answers[q.ref] = q.multi ? (a.includes(k) ? a.filter((x) => x !== k) : [...a, k].sort()) : [k];
       store.save(); draw(); nav();
     }
-    function check() { const n = R.qs[R.idx]; if (!(R.answers[n] || []).length) return; R.checked[n] = true; store.save(); draw(); nav(); }
+    function check() { const ref = R.qs[R.idx]; if (!(R.answers[ref] || []).length) return; R.checked[ref] = true; store.save(); draw(); nav(); }
     function go(i) { if (i < 0 || i >= R.qs.length) return; R.idx = i; store.save(); draw(); nav(); window.scrollTo({ top: 0 }); }
     function confirmFinish() {
-      const un = R.qs.filter((n) => !(R.answers[n] || []).length).length;
+      const un = R.qs.filter((ref) => !(R.answers[ref] || []).length).length;
       if (un && !confirm(`${un} question${un > 1 ? "s are" : " is"} unanswered. Submit anyway?`)) return;
       finish();
     }
     function finish() {
       clearInterval(timerId);
-      const qs = R.qs.map((n) => byN[n]);
-      const wrong = qs.filter((q) => !isRight(q)).map((q) => q.n);
+      const qs = R.qs.map((ref) => QREF[ref]);
+      const wrong = qs.filter((q) => !isRight(q)).map((q) => q.ref);
       const correct = qs.length - wrong.length;
-      (P.exams[e.id] ||= []).push({ date: Date.now(), mode: R.label, total: qs.length, correct, score: pct(correct, qs.length), wrong, qs: R.qs, answers: R.answers, secs: Math.round((Date.now() - R.start) / 1000) });
+      (P.exams[e.id] ||= []).push({ date: Date.now(), mode: R.label, total: qs.length, correct, score: pct(correct, qs.length), wrong, qs: R.qs, order: R.order, answers: R.answers, secs: Math.round((Date.now() - R.start) / 1000) });
       P.run = null; store.save();
       location.hash = `#/exam/${e.id}/results`;
     }
@@ -630,12 +671,12 @@
     keyHandler = (ev) => {
       if (ev.target.closest("input,textarea,select") || ev.metaKey || ev.ctrlKey || ev.altKey) return;
       const k = ev.key.toUpperCase();
-      const q = byN[R.qs[R.idx]];
-      if (q.options.some((o) => o.key === k)) choose(k);
+      const q = QREF[R.qs[R.idx]];
+      if (k.length === 1 && LETTERS.slice(0, q.options.length).includes(k)) choose(k);
       else if (ev.key === "ArrowRight") go(R.idx + 1);
       else if (ev.key === "ArrowLeft") go(R.idx - 1);
       else if (k === "F") $("#flagBtn").click();
-      else if (ev.key === "Enter" && study && !R.checked[q.n]) check();
+      else if (ev.key === "Enter" && study && !R.checked[q.ref]) check();
       else if (ev.key === "Enter" && R.idx < R.qs.length - 1) go(R.idx + 1);
       else return;
       ev.preventDefault();
@@ -643,13 +684,11 @@
     draw(); nav();
   }
 
-  function examResults(e) {
-    const hist = P.exams[e.id] || [];
+  function examResults(e, hist) {
     const i = +(new URLSearchParams(location.hash.split("?")[1] || "").get("i") ?? hist.length - 1);
     const h = hist[Number.isNaN(i) ? hist.length - 1 : i];
     if (!h) { location.hash = `#/exam/${e.id}`; return; }
-    const { pass } = examMeta(e);
-    const byN = Object.fromEntries(e.questions.map((x) => [x.n, x]));
+    const { pass, mins } = examMeta(e);
     const verdict = h.score >= 85 ? ["ok", "Excellent — exam-ready territory."] : h.score >= pass ? ["warn", "Pass, but aim for 85%+ before booking."] : ["bad", "Not yet — review the explanations below and the related lessons."];
     main.innerHTML = `<div class="page">
       <p class="eyebrow">${esc(e.title)} · results</p>
@@ -663,18 +702,18 @@
     </div>`;
     const draw = () => {
       const only = $("#onlyWrong").checked;
-      $("#review").innerHTML = h.qs.filter((n) => !only || h.wrong.includes(n)).map((n) => {
-        const q = byN[n], sel = h.answers[n] || [], ok = !h.wrong.includes(n);
-        return `<div class="review-item"><div class="row" style="margin-bottom:6px"><span class="pill ${ok ? "ok" : "bad"}">${ok ? "✓ Correct" : "✗ Incorrect"}</span><span class="muted" style="font-size:13px">Question ${n}</span></div>
+      $("#review").innerHTML = h.qs.map((ref, idx) => [ref, idx]).filter(([ref]) => !only || h.wrong.includes(ref)).map(([ref, idx]) => {
+        const q = QREF[ref], sel = h.answers[ref] || [], ok = !h.wrong.includes(ref);
+        return `<div class="review-item"><div class="row" style="margin-bottom:6px"><span class="pill ${ok ? "ok" : "bad"}">${ok ? "✓ Correct" : "✗ Incorrect"}</span><span class="muted" style="font-size:13px">Question ${idx + 1}${e === RANDOM_EXAM ? ` · from ${esc(q.source)}` : ""}</span></div>
           <div class="question">${marked.parse(q.q)}</div>
-          <div class="opts">${q.options.map((o) => `<div class="opt${q.answer.includes(o.key) ? " correct" : sel.includes(o.key) ? " incorrect" : ""}"><span class="key">${o.key}</span><span>${inline(o.text)}</span></div>`).join("")}</div>
+          <div class="opts">${optView(q, h.order[ref]).map((o) => `<div class="opt${q.answer.includes(o.key) ? " correct" : sel.includes(o.key) ? " incorrect" : ""}"><span class="key">${o.letter}</span><span>${inline(o.text)}</span></div>`).join("")}</div>
           <div class="explain ${ok ? "ok" : "bad"}">${sel.length ? "" : "<b>Not answered.</b> "}${inline(q.explanation)}</div></div>`;
       }).join("") || `<div class="empty">Perfect score — nothing to review. 🎉</div>`;
     };
     $("#onlyWrong").onchange = draw; draw();
     $("#retryBtn") && ($("#retryBtn").onclick = () => {
-      P.run = { exam: e.id, mode: "study", label: "retry", qs: h.wrong, idx: 0, answers: {}, checked: {}, flags: {}, start: Date.now(), deadline: null };
-      store.save(); location.hash = `#/exam/${e.id}`;
+      newRun(e, "study", "retry", h.wrong, mins);
+      location.hash = `#/exam/${e.id}`;
     });
     window.scrollTo(0, 0);
   }
@@ -1154,7 +1193,7 @@
     switch (page || "") {
       case "": pageDashboard(); break;
       case "lesson": pageLesson(a, b, rest.length ? rest.map(decodeURIComponent).join("/") : undefined, q); titles.push(C.lessons.find((l) => l.id === a)?.title); break;
-      case "exam": pageExam(a, b); titles.push(C.exams.find((e) => e.id === a)?.title); break;
+      case "exam": pageExam(a, b); titles.push(examById(a)?.title); break;
       case "flashcards": pageFlashcards(); titles.push("Flashcards"); break;
       case "cheatsheet": { const c = C.cheatsheets.find((x) => x.id === a); c ? pageDoc(c.md, "cheatsheets", q) : pageNotFound(); titles.push(c?.title); break; }
       case "objectives": pageDoc(C.objectives, "", q, { checklist: true }); titles.push("Exam objectives"); break;
