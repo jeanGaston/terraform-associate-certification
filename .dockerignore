@@ -13,3 +13,4 @@ site/content.js
 Dockerfile
 compose.yaml
 .dockerignore
+.github

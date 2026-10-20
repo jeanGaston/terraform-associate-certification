@@ -103,6 +103,15 @@ docker compose down -v                 # stop and delete sandboxes + provider ca
 - Your lab sandboxes live in the `lab-workspace` volume. Providers and `terraform login` credentials (lab 08)
   live in `terraform-home`. Both survive restarts and rebuilds.
 - After editing course Markdown, run `docker compose up -d --build` to rebuild the image with the new content.
+- CI publishes a prebuilt image (amd64 + arm64) to `ghcr.io/jeangaston/terraform-associate-certification`
+  on every push to `main`. To use it instead of building locally (private repo: run
+  `docker login ghcr.io` first, with a token that has `read:packages`):
+
+  ```bash
+  docker pull ghcr.io/jeangaston/terraform-associate-certification:latest
+  docker tag ghcr.io/jeangaston/terraform-associate-certification:latest terraform-associate-lab:latest
+  docker compose up -d                 # no --build: runs the pulled image
+  ```
 
 #### Option B — natively (WSL, Linux, macOS)
 
