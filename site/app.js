@@ -88,6 +88,13 @@
       const r = routeFor(resolvePath(baseDir, href));
       if (r) a.setAttribute("href", r); else a.removeAttribute("href");
     });
+    // GitHub alerts: "> [!WARNING]" becomes a styled callout instead of literal text
+    $$("blockquote > p:first-child", div).forEach((p) => {
+      const m = p.innerHTML.match(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*(<br>)?\s*/);
+      if (!m) return;
+      p.innerHTML = p.innerHTML.slice(m[0].length);
+      p.parentElement.classList.add("alert", m[1].toLowerCase());
+    });
     $$("pre > code", div).forEach((code) => {
       const lang = (code.className.match(/language-(\w+)/) || [])[1];
       if (lang === "sh" || lang === "shell") code.className = "language-bash";

@@ -6,7 +6,7 @@ services:
       context: .
       args:
         TERRAFORM_VERSION: ${TERRAFORM_VERSION:-1.16.6}
-    image: terraform-associate-lab:latest
+    image: ghcr.io/jeangaston/terraform-associate-certification:latest   # published by CI; --build builds it locally
     init: true                 # reaps processes left behind by lab shells
     ports:
       - "127.0.0.1:${LAB_PORT:-8000}:8000"   # localhost only, never exposed on your network
